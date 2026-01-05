@@ -33,6 +33,76 @@ const router = Router();
  *         description: User registered
  */
 router.post("/register", AuthController.register);
+
+/**
+ * @swagger
+ * /auth/register/admin:
+ *   post:
+ *     summary: Register a new admin user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Admin registered
+ */
+router.post("/register/admin", AuthController.registerAdmin);
+
+/**
+ * @swagger
+ * /auth/register/user:
+ *   post:
+ *     summary: Register a new regular user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User registered
+ */
+router.post("/register/user", AuthController.registerUser);
+
+/**
+ * @swagger
+ * /auth/register/tutor:
+ *   post:
+ *     summary: Register a new tutor user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Tutor registered
+ */
+router.post("/register/tutor", AuthController.registerTutor);
+
 /**
  * @swagger
  * /auth/login:
