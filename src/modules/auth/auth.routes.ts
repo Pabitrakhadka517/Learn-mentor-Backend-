@@ -13,7 +13,7 @@ const router = Router();
 
 /**
  * @swagger
- * /auth/register:
+ * /api/auth/register:
  *   post:
  *     summary: Register a new user
  *     tags: [Auth]
@@ -36,7 +36,7 @@ router.post("/register", AuthController.register);
 
 /**
  * @swagger
- * /auth/register/admin:
+ * /api/auth/register/admin:
  *   post:
  *     summary: Register a new admin user
  *     tags: [Auth]
@@ -59,7 +59,7 @@ router.post("/register/admin", AuthController.registerAdmin);
 
 /**
  * @swagger
- * /auth/register/user:
+ * /api/auth/register/user:
  *   post:
  *     summary: Register a new regular user
  *     tags: [Auth]
@@ -82,7 +82,7 @@ router.post("/register/user", AuthController.registerUser);
 
 /**
  * @swagger
- * /auth/register/tutor:
+ * /api/auth/register/tutor:
  *   post:
  *     summary: Register a new tutor user
  *     tags: [Auth]
@@ -105,7 +105,7 @@ router.post("/register/tutor", AuthController.registerTutor);
 
 /**
  * @swagger
- * /auth/login:
+ * /api/auth/login:
  *   post:
  *     summary: Login a user
  *     tags: [Auth]
@@ -127,7 +127,7 @@ router.post("/register/tutor", AuthController.registerTutor);
 router.post("/login", AuthController.login);
 /**
  * @swagger
- * /auth/refresh:
+ * /api/auth/refresh:
  *   post:
  *     summary: Refresh access token
  *     tags: [Auth]
@@ -147,7 +147,7 @@ router.post("/login", AuthController.login);
 router.post("/refresh", AuthController.refresh);
 /**
  * @swagger
- * /auth/logout:
+ * /api/auth/logout:
  *   post:
  *     summary: Logout a user
  *     tags: [Auth]

@@ -9,7 +9,10 @@ import authRoutes from "./modules/auth/auth.routes";
 const app = express();
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: true, // Allow all origins
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -22,7 +25,7 @@ const swaggerOptions: swaggerJsdoc.Options = {
       version: "1.0.0",
       description: "API documentation for LearnMentor backend"
     },
-    servers: [{ url: "http://localhost:5000" }]
+    servers: [{ url: "http://localhost:4000" }]
   },
   apis: ["./src/modules/**/*.ts"]
 };
@@ -31,7 +34,7 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
 app.use("/swagger", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-app.use("/auth", authRoutes);
+app.use("/api/auth", authRoutes);
 
 app.get("/", (_req, res) => {
   res.send('<h1>Server running 🚀 <a href="/swagger">Swagger Docs</a></h1>');
