@@ -20,13 +20,13 @@ const swaggerOptions = {
             version: "1.0.0",
             description: "API documentation for LearnMentor backend"
         },
-        servers: [{ url: "http://localhost:5000" }]
+        servers: [{ url: "http://localhost:4000" }]
     },
     apis: ["./src/modules/**/*.ts"]
 };
 const swaggerSpec = (0, swagger_jsdoc_1.default)(swaggerOptions);
 app.use("/swagger", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec));
-app.use("/auth", auth_routes_1.default);
+app.use("/api/auth", auth_routes_1.default);
 app.get("/", (_req, res) => {
     res.send('<h1>Server running 🚀 <a href="/swagger">Swagger Docs</a></h1>');
 });
