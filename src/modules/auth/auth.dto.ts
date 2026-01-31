@@ -55,6 +55,11 @@ export interface LoginResponseDTO {
     id: string;
     email: string;
     role: string;
+    name?: string;
+    phone?: string;
+    speciality?: string;
+    address?: string;
+    profileImage?: string;
   };
 }
 

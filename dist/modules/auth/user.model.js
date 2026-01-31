@@ -7,6 +7,11 @@ const userSchema = new mongoose_1.Schema({
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['user', 'admin', 'tutor'], default: 'user' },
     refreshTokenHash: String,
+    name: String,
+    phone: String,
+    speciality: String,
+    address: String,
+    profileImage: String,
     location: {
         lat: Number,
         lng: Number,

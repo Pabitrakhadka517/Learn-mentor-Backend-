@@ -4,6 +4,7 @@ import swaggerUi from "swagger-ui-express";
 import swaggerJsdoc from "swagger-jsdoc";
 
 import authRoutes from "./modules/auth/auth.routes";
+import profileRoutes from "./modules/profile/profile.routes";
 
 
 const app = express();
@@ -35,6 +36,7 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use("/swagger", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
 
 app.get("/", (_req, res) => {
   res.send('<h1>Server running 🚀 <a href="/swagger">Swagger Docs</a></h1>');
