@@ -1,0 +1,336 @@
+{
+    "info": {
+        "name": "LearnMentor Profile API",
+        "description": "Complete collection for testing Profile Management API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:4000",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "YOUR_TOKEN_HERE",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.collectionVariables.set('token', jsonData.accessToken);",
+                                    "    console.log('Token saved:', jsonData.accessToken);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/auth/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Login to get access token. Token will be automatically saved to collection variable."
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Profile",
+            "item": [
+                {
+                    "name": "Get Profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "profile"
+                            ]
+                        },
+                        "description": "Get current user's profile information"
+                    }
+                },
+                {
+                    "name": "Update Basic Info",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "name",
+                                    "value": "John Doe",
+                                    "type": "text",
+                                    "description": "User's full name (2-100 characters)"
+                                },
+                                {
+                                    "key": "phone",
+                                    "value": "1234567890",
+                                    "type": "text",
+                                    "description": "Phone number (10-15 digits)"
+                                },
+                                {
+                                    "key": "speciality",
+                                    "value": "Mathematics Teacher",
+                                    "type": "text",
+                                    "description": "User's speciality or expertise"
+                                },
+                                {
+                                    "key": "address",
+                                    "value": "123 Main Street, New York, NY 10001",
+                                    "type": "text",
+                                    "description": "User's address"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "profile"
+                            ]
+                        },
+                        "description": "Update profile basic information (name, phone, speciality, address)"
+                    }
+                },
+                {
+                    "name": "Update with Image",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "name",
+                                    "value": "Jane Smith",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "phone",
+                                    "value": "9876543210",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "speciality",
+                                    "value": "Physics Teacher",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "address",
+                                    "value": "456 Oak Avenue, Los Angeles, CA 90001",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "profileImage",
+                                    "type": "file",
+                                    "src": [],
+                                    "description": "Profile image file (max 5MB, images only)"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "profile"
+                            ]
+                        },
+                        "description": "Update profile with image upload to Cloudinary"
+                    }
+                },
+                {
+                    "name": "Change Password",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "oldPassword",
+                                    "value": "currentPassword123",
+                                    "type": "text",
+                                    "description": "Current password"
+                                },
+                                {
+                                    "key": "newPassword",
+                                    "value": "newSecurePassword456",
+                                    "type": "text",
+                                    "description": "New password (min 6 characters)"
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "profile"
+                            ]
+                        },
+                        "description": "Change user password with old password verification"
+                    }
+                },
+                {
+                    "name": "Update Everything",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "formdata",
+                            "formdata": [
+                                {
+                                    "key": "name",
+                                    "value": "Sarah Johnson",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "phone",
+                                    "value": "5551234567",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "speciality",
+                                    "value": "Chemistry Teacher",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "address",
+                                    "value": "789 Pine Road, Chicago, IL 60601",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "oldPassword",
+                                    "value": "currentPassword123",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "newPassword",
+                                    "value": "newSecurePassword456",
+                                    "type": "text"
+                                },
+                                {
+                                    "key": "profileImage",
+                                    "type": "file",
+                                    "src": []
+                                }
+                            ]
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "profile"
+                            ]
+                        },
+                        "description": "Update profile info, upload image, and change password all at once"
+                    }
+                },
+                {
+                    "name": "Delete Profile Image",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{token}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/profile/image",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "api",
+                                "profile",
+                                "image"
+                            ]
+                        },
+                        "description": "Delete profile image from database and Cloudinary"
+                    }
+                }
+            ]
+        }
+    ]
+}

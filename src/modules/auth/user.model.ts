@@ -7,12 +7,19 @@ export interface IUser extends Document {
     passwordHash: string;
     role: UserRole;
     refreshTokenHash?: string;
+    name?: string;
+    phone?: string;
+    speciality?: string;
+    address?: string;
+    profileImage?: string;
     location?: {
         lat: number;
         lng: number;
         city?: string;
         country?: string;
     };
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
 const userSchema = new Schema<IUser>({
@@ -20,6 +27,11 @@ const userSchema = new Schema<IUser>({
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['user', 'admin', 'tutor'], default: 'user' },
     refreshTokenHash: String,
+    name: String,
+    phone: String,
+    speciality: String,
+    address: String,
+    profileImage: String,
     location: {
         lat: Number,
         lng: Number,

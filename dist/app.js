@@ -8,8 +8,12 @@ const cors_1 = __importDefault(require("cors"));
 const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const swagger_jsdoc_1 = __importDefault(require("swagger-jsdoc"));
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
+const profile_routes_1 = __importDefault(require("./modules/profile/profile.routes"));
 const app = (0, express_1.default)();
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: true,
+    credentials: true
+}));
 app.use(express_1.default.json());
 app.use(express_1.default.urlencoded({ extended: true }));
 const swaggerOptions = {
@@ -27,6 +31,7 @@ const swaggerOptions = {
 const swaggerSpec = (0, swagger_jsdoc_1.default)(swaggerOptions);
 app.use("/swagger", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec));
 app.use("/api/auth", auth_routes_1.default);
+app.use("/api/profile", profile_routes_1.default);
 app.get("/", (_req, res) => {
     res.send('<h1>Server running 🚀 <a href="/swagger">Swagger Docs</a></h1>');
 });

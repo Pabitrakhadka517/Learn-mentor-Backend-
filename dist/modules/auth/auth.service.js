@@ -23,6 +23,11 @@ class AuthService {
                 id: user._id.toString(),
                 email: user.email,
                 role: user.role,
+                name: user.name,
+                phone: user.phone,
+                speciality: user.speciality,
+                address: user.address,
+                profileImage: user.profileImage,
             },
         };
     }
@@ -40,6 +45,11 @@ class AuthService {
                 id: user._id.toString(),
                 email: user.email,
                 role: user.role,
+                name: user.name,
+                phone: user.phone,
+                speciality: user.speciality,
+                address: user.address,
+                profileImage: user.profileImage,
             },
         };
     }
@@ -65,6 +75,11 @@ class AuthService {
                 id: user._id.toString(),
                 email: user.email,
                 role: user.role || "user",
+                name: user.name,
+                phone: user.phone,
+                speciality: user.speciality,
+                address: user.address,
+                profileImage: user.profileImage,
             },
         };
     }
