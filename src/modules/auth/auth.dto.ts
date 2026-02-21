@@ -1,66 +1,92 @@
 import { z } from 'zod';
 
-// Register DTO with Zod validation
+// Registration DTO
 export const RegisterDTOSchema = z.object({
-  email: z
-    .string({ required_error: "Email is required" })
-    .email("Invalid email format")
-    .toLowerCase(),
-  password: z
-    .string({ required_error: "Password is required" })
-    .min(6, "Password must be at least 6 characters long")
-    .min(1, "Password cannot be empty"),
+  email: z.string().email('Invalid email format'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[@$!%*?&#]/, 'Password must contain at least one special character'),
+  fullName: z.string().optional(),
+  phone: z.string().optional(),
+  role: z.enum(['STUDENT', 'TUTOR']).optional().default('STUDENT'),
 });
 
 export type RegisterDTO = z.infer<typeof RegisterDTOSchema>;
 
-// Login DTO with Zod validation
+// Login DTO
 export const LoginDTOSchema = z.object({
-  email: z
-    .string({ required_error: "Email is required" })
-    .email("Invalid email format")
-    .toLowerCase(),
-  password: z
-    .string({ required_error: "Password is required" })
-    .min(1, "Password cannot be empty"),
+  email: z.string().email('Invalid email format'),
+  password: z.string().min(1, 'Password is required'),
 });
 
 export type LoginDTO = z.infer<typeof LoginDTOSchema>;
 
-// Register with Role DTO
-export const RegisterAdminDTOSchema = RegisterDTOSchema.extend({
-  role: z.literal('admin').optional(),
+// Refresh Token DTO
+export const RefreshTokenDTOSchema = z.object({
+  refreshToken: z.string().min(1, 'Refresh token is required'),
 });
 
-export type RegisterAdminDTO = z.infer<typeof RegisterAdminDTOSchema>;
+export type RefreshTokenDTO = z.infer<typeof RefreshTokenDTOSchema>;
 
-export const RegisterUserDTOSchema = RegisterDTOSchema.extend({
-  role: z.literal('user').optional(),
+// Forgot Password DTO
+export const ForgotPasswordDTOSchema = z.object({
+  email: z.string().email('Invalid email format'),
 });
 
-export type RegisterUserDTO = z.infer<typeof RegisterUserDTOSchema>;
+export type ForgotPasswordDTO = z.infer<typeof ForgotPasswordDTOSchema>;
 
-export const RegisterTutorDTOSchema = RegisterDTOSchema.extend({
-  role: z.literal('tutor').optional(),
+// Reset Password DTO
+export const ResetPasswordDTOSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  newPassword: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Password must contain at least one number')
+    .regex(/[@$!%*?&#]/, 'Password must contain at least one special character'),
 });
 
-export type RegisterTutorDTO = z.infer<typeof RegisterTutorDTOSchema>;
+export type ResetPasswordDTO = z.infer<typeof ResetPasswordDTOSchema>;
 
-// Login Response DTO
+// Response DTOs
+export interface UserResponseDTO {
+  id: string;
+  email: string;
+  role: string;
+  fullName?: string;
+  phone?: string;
+  profileImage?: string;
+  speciality?: string;
+  address?: string;
+  theme?: 'light' | 'dark' | 'system';
+  isVerified: boolean;
+  verificationStatus?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface LoginResponseDTO {
   message: string;
   accessToken: string;
   refreshToken: string;
-  user: {
-    id: string;
-    email: string;
-    role: string;
-  };
+  user: UserResponseDTO;
 }
 
-// Validation error response
-export interface ValidationErrorDTO {
-  field: string;
+export interface RegisterResponseDTO {
+  message: string;
+  accessToken: string;
+  refreshToken: string;
+  user: UserResponseDTO;
+}
+
+export interface RefreshResponseDTO {
+  accessToken: string;
+}
+
+export interface MessageResponseDTO {
   message: string;
 }
-

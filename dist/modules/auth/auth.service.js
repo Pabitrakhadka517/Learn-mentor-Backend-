@@ -5,89 +5,141 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const crypto_1 = __importDefault(require("crypto"));
 const auth_repository_1 = require("./auth.repository");
 const jwt_1 = require("../../config/jwt");
 const auth_dto_1 = require("./auth.dto");
 class AuthService {
     static async register(dto) {
         const validated = auth_dto_1.RegisterDTOSchema.parse(dto);
+        if (validated.role === 'ADMIN') {
+            throw new Error('Admin accounts cannot be created via public registration');
+        }
         const emailExists = await auth_repository_1.AuthRepository.emailExists(validated.email);
         if (emailExists) {
-            throw new Error("Email already exists");
+            throw new Error('Email already exists');
         }
         const passwordHash = await auth_repository_1.AuthRepository.hashPassword(validated.password);
-        const user = await auth_repository_1.AuthRepository.createUser(validated.email, passwordHash, "user");
+        const role = validated.role || 'STUDENT';
+        const user = await auth_repository_1.AuthRepository.createUser(validated.email, passwordHash, role, validated.fullName, validated.phone);
+        const { accessToken, refreshToken } = await this.generateTokens(user._id.toString(), user.role, user.email);
+        const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const refreshTokenHash = await auth_repository_1.AuthRepository.hashPassword(refreshToken);
+        await auth_repository_1.AuthRepository.storeRefreshToken(user._id.toString(), refreshTokenHash, refreshTokenExpiry);
         return {
-            message: "User registered successfully",
-            user: {
-                id: user._id.toString(),
-                email: user.email,
-                role: user.role,
-            },
-        };
-    }
-    static async registerWithRole(dto, role) {
-        const validated = auth_dto_1.RegisterDTOSchema.parse(dto);
-        const emailExists = await auth_repository_1.AuthRepository.emailExists(validated.email);
-        if (emailExists) {
-            throw new Error("Email already exists");
-        }
-        const passwordHash = await auth_repository_1.AuthRepository.hashPassword(validated.password);
-        const user = await auth_repository_1.AuthRepository.createUser(validated.email, passwordHash, role);
-        return {
-            message: `${role.charAt(0).toUpperCase() + role.slice(1)} registered successfully`,
-            user: {
-                id: user._id.toString(),
-                email: user.email,
-                role: user.role,
-            },
+            message: 'User registered successfully',
+            accessToken,
+            refreshToken,
+            user: this.mapUserToDTO(user),
         };
     }
     static async login(dto) {
         const validated = auth_dto_1.LoginDTOSchema.parse(dto);
         const user = await auth_repository_1.AuthRepository.findByEmail(validated.email);
         if (!user) {
-            throw new Error("Invalid credentials");
+            throw new Error('Invalid credentials');
+        }
+        if (!user.isActive) {
+            throw new Error('Account is deactivated. Please contact support.');
         }
         const isPasswordValid = await auth_repository_1.AuthRepository.verifyPassword(validated.password, user.passwordHash);
         if (!isPasswordValid) {
-            throw new Error("Invalid credentials");
+            throw new Error('Invalid credentials');
         }
-        const accessToken = jsonwebtoken_1.default.sign({ sub: user._id, role: user.role }, jwt_1.jwtConfig.accessSecret, { expiresIn: jwt_1.jwtConfig.accessExpiry });
-        const refreshToken = jsonwebtoken_1.default.sign({ sub: user._id }, jwt_1.jwtConfig.refreshSecret, { expiresIn: jwt_1.jwtConfig.refreshExpiry });
+        const { accessToken, refreshToken } = await this.generateTokens(user._id.toString(), user.role, user.email);
+        const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         const refreshTokenHash = await auth_repository_1.AuthRepository.hashPassword(refreshToken);
-        await auth_repository_1.AuthRepository.updateRefreshTokenHash(user._id.toString(), refreshTokenHash);
+        await auth_repository_1.AuthRepository.storeRefreshToken(user._id.toString(), refreshTokenHash, refreshTokenExpiry);
         return {
-            message: "Logged in successfully",
+            message: 'Logged in successfully',
             accessToken,
             refreshToken,
-            user: {
-                id: user._id.toString(),
-                email: user.email,
-                role: user.role || "user",
-            },
+            user: this.mapUserToDTO(user),
         };
     }
-    static async refresh(refreshToken) {
+    static async refreshAccessToken(refreshToken) {
         try {
             const payload = jsonwebtoken_1.default.verify(refreshToken, jwt_1.jwtConfig.refreshSecret);
-            const user = await auth_repository_1.AuthRepository.findById(payload.sub);
-            if (!user || !user.refreshTokenHash) {
-                throw new Error("Unauthorized");
+            const user = await auth_repository_1.AuthRepository.findById(payload.userId);
+            if (!user) {
+                throw new Error('User not found');
             }
-            const isValid = await auth_repository_1.AuthRepository.verifyPassword(refreshToken, user.refreshTokenHash);
-            if (!isValid) {
-                throw new Error("Unauthorized");
+            if (!user.isActive) {
+                throw new Error('Account is deactivated');
             }
-            const accessToken = jsonwebtoken_1.default.sign({ sub: user._id, role: user.role }, jwt_1.jwtConfig.accessSecret, { expiresIn: jwt_1.jwtConfig.accessExpiry });
+            const refreshTokenHash = await auth_repository_1.AuthRepository.hashPassword(refreshToken);
+            const storedToken = await auth_repository_1.AuthRepository.findRefreshToken(user._id.toString(), refreshTokenHash);
+            if (!storedToken) {
+                throw new Error('Invalid refresh token');
+            }
+            const accessToken = jsonwebtoken_1.default.sign({
+                userId: user._id,
+                role: user.role,
+                email: user.email,
+            }, jwt_1.jwtConfig.accessSecret, { expiresIn: jwt_1.jwtConfig.accessExpiry });
             return { accessToken };
         }
         catch (error) {
-            throw new Error("Invalid refresh token");
+            throw new Error('Invalid or expired refresh token. Please login again.');
         }
     }
     static async logout(userId) {
-        await auth_repository_1.AuthRepository.clearRefreshToken(userId);
+        await auth_repository_1.AuthRepository.deleteRefreshToken(userId);
+        return { message: 'Logged out successfully' };
+    }
+    static async forgotPassword(dto) {
+        const validated = auth_dto_1.ForgotPasswordDTOSchema.parse(dto);
+        const user = await auth_repository_1.AuthRepository.findByEmail(validated.email);
+        if (!user) {
+            return { message: 'If the email exists, a password reset link has been sent.' };
+        }
+        const resetToken = crypto_1.default.randomBytes(32).toString('hex');
+        const resetTokenHash = await auth_repository_1.AuthRepository.hashPassword(resetToken);
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+        await auth_repository_1.AuthRepository.createPasswordResetToken(user._id, resetTokenHash, expiresAt);
+        console.log(`Password reset token for ${user.email}: ${resetToken}`);
+        console.log(`Reset link: http://localhost:4000/reset-password?token=${resetToken}`);
+        return { message: 'If the email exists, a password reset link has been sent.' };
+    }
+    static async resetPassword(dto) {
+        const validated = auth_dto_1.ResetPasswordDTOSchema.parse(dto);
+        const tokenHash = await auth_repository_1.AuthRepository.hashPassword(validated.token);
+        const resetToken = await auth_repository_1.AuthRepository.findPasswordResetToken(tokenHash);
+        if (!resetToken) {
+            throw new Error('Invalid or expired reset token');
+        }
+        const newPasswordHash = await auth_repository_1.AuthRepository.hashPassword(validated.newPassword);
+        await auth_repository_1.AuthRepository.updatePassword(resetToken.userId, newPasswordHash);
+        await auth_repository_1.AuthRepository.markResetTokenAsUsed(resetToken._id.toString());
+        await auth_repository_1.AuthRepository.deleteRefreshToken(resetToken.userId);
+        return { message: 'Password reset successfully. Please login with your new password.' };
+    }
+    static async generateTokens(userId, role, email) {
+        const accessToken = jsonwebtoken_1.default.sign({
+            userId,
+            role,
+            email,
+        }, jwt_1.jwtConfig.accessSecret, { expiresIn: jwt_1.jwtConfig.accessExpiry });
+        const refreshToken = jsonwebtoken_1.default.sign({
+            userId,
+        }, jwt_1.jwtConfig.refreshSecret, { expiresIn: jwt_1.jwtConfig.refreshExpiry });
+        return { accessToken, refreshToken };
+    }
+    static mapUserToDTO(user) {
+        return {
+            id: user._id?.toString() || user._id,
+            email: user.email,
+            role: user.role,
+            fullName: user.fullName,
+            phone: user.phone,
+            profileImage: user.profileImage,
+            speciality: user.speciality,
+            address: user.address,
+            isVerified: user.isVerified,
+            isActive: user.isActive,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+        };
     }
 }
 exports.AuthService = AuthService;

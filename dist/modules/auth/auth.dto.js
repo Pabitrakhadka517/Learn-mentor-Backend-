@@ -1,33 +1,36 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RegisterTutorDTOSchema = exports.RegisterUserDTOSchema = exports.RegisterAdminDTOSchema = exports.LoginDTOSchema = exports.RegisterDTOSchema = void 0;
+exports.ResetPasswordDTOSchema = exports.ForgotPasswordDTOSchema = exports.RefreshTokenDTOSchema = exports.LoginDTOSchema = exports.RegisterDTOSchema = void 0;
 const zod_1 = require("zod");
 exports.RegisterDTOSchema = zod_1.z.object({
-    email: zod_1.z
-        .string({ required_error: "Email is required" })
-        .email("Invalid email format")
-        .toLowerCase(),
-    password: zod_1.z
-        .string({ required_error: "Password is required" })
-        .min(6, "Password must be at least 6 characters long")
-        .min(1, "Password cannot be empty"),
+    email: zod_1.z.string().email('Invalid email format'),
+    password: zod_1.z.string()
+        .min(8, 'Password must be at least 8 characters')
+        .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+        .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+        .regex(/[0-9]/, 'Password must contain at least one number')
+        .regex(/[@$!%*?&#]/, 'Password must contain at least one special character'),
+    fullName: zod_1.z.string().optional(),
+    phone: zod_1.z.string().optional(),
+    role: zod_1.z.enum(['STUDENT', 'TUTOR']).optional().default('STUDENT'),
 });
 exports.LoginDTOSchema = zod_1.z.object({
-    email: zod_1.z
-        .string({ required_error: "Email is required" })
-        .email("Invalid email format")
-        .toLowerCase(),
-    password: zod_1.z
-        .string({ required_error: "Password is required" })
-        .min(1, "Password cannot be empty"),
+    email: zod_1.z.string().email('Invalid email format'),
+    password: zod_1.z.string().min(1, 'Password is required'),
 });
-exports.RegisterAdminDTOSchema = exports.RegisterDTOSchema.extend({
-    role: zod_1.z.literal('admin').optional(),
+exports.RefreshTokenDTOSchema = zod_1.z.object({
+    refreshToken: zod_1.z.string().min(1, 'Refresh token is required'),
 });
-exports.RegisterUserDTOSchema = exports.RegisterDTOSchema.extend({
-    role: zod_1.z.literal('user').optional(),
+exports.ForgotPasswordDTOSchema = zod_1.z.object({
+    email: zod_1.z.string().email('Invalid email format'),
 });
-exports.RegisterTutorDTOSchema = exports.RegisterDTOSchema.extend({
-    role: zod_1.z.literal('tutor').optional(),
+exports.ResetPasswordDTOSchema = zod_1.z.object({
+    token: zod_1.z.string().min(1, 'Reset token is required'),
+    newPassword: zod_1.z.string()
+        .min(8, 'Password must be at least 8 characters')
+        .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+        .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+        .regex(/[0-9]/, 'Password must contain at least one number')
+        .regex(/[@$!%*?&#]/, 'Password must contain at least one special character'),
 });
 //# sourceMappingURL=auth.dto.js.map

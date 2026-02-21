@@ -6,11 +6,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 const app_1 = __importDefault(require("./app"));
 const db_1 = __importDefault(require("./config/db"));
+const auth_seeding_1 = require("./modules/auth/auth.seeding");
 dotenv_1.default.config();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 (async () => {
     try {
         await (0, db_1.default)();
+        await (0, auth_seeding_1.seedAdmin)();
         app_1.default.listen(PORT, () => {
             console.log(`🚀 Server running at http://localhost:${PORT}/swagger/`);
         });

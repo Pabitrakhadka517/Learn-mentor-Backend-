@@ -1,0 +1,810 @@
+{
+    "info": {
+        "_postman_id": "mvp-features-2026",
+        "name": "LearnMentor MVP Features",
+        "description": "Complete API testing collection for all MVP backend features including session lifecycle, dashboards, and double booking prevention",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{access_token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "item": [
+        {
+            "name": "1. Session Lifecycle",
+            "item": [
+                {
+                    "name": "Create Booking (Student)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('booking_id', response.booking._id);",
+                                    "    pm.test('Booking created successfully', () => {",
+                                    "        pm.expect(response.success).to.be.true;",
+                                    "        pm.expect(response.booking.status).to.equal('PENDING');",
+                                    "    });",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tutorId\": \"{{tutor_id}}\",\n  \"scheduledTime\": \"2026-02-25T10:00:00.000Z\",\n  \"durationHours\": 1\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings/book",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings",
+                                "book"
+                            ]
+                        },
+                        "description": "Student creates a new booking request"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Accept Booking (Tutor)",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"ACCEPTED\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings/{{booking_id}}/status",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings",
+                                "{{booking_id}}",
+                                "status"
+                            ]
+                        },
+                        "description": "Tutor accepts a pending booking"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Complete Booking (Tutor)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Booking completed successfully', () => {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.success).to.be.true;",
+                                    "    pm.expect(response.booking.status).to.equal('COMPLETED');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings/{{booking_id}}/complete",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings",
+                                "{{booking_id}}",
+                                "complete"
+                            ]
+                        },
+                        "description": "Tutor marks a session as completed. Only works if booking is PAID or ACCEPTED."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Cancel Booking (Student/Tutor)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Booking cancelled successfully', () => {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.success).to.be.true;",
+                                    "    pm.expect(response.booking.status).to.equal('CANCELLED');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "PATCH",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings/{{booking_id}}/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings",
+                                "{{booking_id}}",
+                                "cancel"
+                            ]
+                        },
+                        "description": "Student or Tutor cancels a booking. Cannot cancel if already COMPLETED."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get My Bookings",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Bookings retrieved successfully', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(200);",
+                                    "    const bookings = pm.response.json();",
+                                    "    pm.expect(bookings).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings"
+                            ]
+                        },
+                        "description": "Get all bookings for logged-in user (student or tutor)"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Session lifecycle management endpoints"
+        },
+        {
+            "name": "2. Double Booking Prevention",
+            "item": [
+                {
+                    "name": "Create First Booking",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 201) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('first_booking_id', response.booking._id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tutorId\": \"{{tutor_id}}\",\n  \"scheduledTime\": \"2026-02-26T14:00:00.000Z\",\n  \"durationHours\": 1\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings/book",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings",
+                                "book"
+                            ]
+                        },
+                        "description": "Create a booking at 2:00 PM - 3:00 PM"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Try Overlapping Booking (Should Fail)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Double booking prevented', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(409);",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.message).to.include('already booked');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tutorId\": \"{{tutor_id}}\",\n  \"scheduledTime\": \"2026-02-26T14:30:00.000Z\",\n  \"durationHours\": 1\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings/book",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings",
+                                "book"
+                            ]
+                        },
+                        "description": "Try to book 2:30 PM - 3:30 PM (overlaps with 2:00-3:00). Should return 409 Conflict."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Non-Overlapping Booking (Should Work)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Non-overlapping booking created', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(201);",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.success).to.be.true;",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"tutorId\": \"{{tutor_id}}\",\n  \"scheduledTime\": \"2026-02-26T15:00:00.000Z\",\n  \"durationHours\": 1\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/bookings/book",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "bookings",
+                                "book"
+                            ]
+                        },
+                        "description": "Book 3:00 PM - 4:00 PM (no overlap). Should succeed."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Test double booking prevention logic"
+        },
+        {
+            "name": "3. Dashboards",
+            "item": [
+                {
+                    "name": "Student Dashboard",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Student dashboard retrieved', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(200);",
+                                    "    const data = pm.response.json();",
+                                    "    pm.expect(data).to.have.property('totalMoneySpent');",
+                                    "    pm.expect(data).to.have.property('totalTutorsWorkedWith');",
+                                    "    pm.expect(data).to.have.property('totalSessionsCompleted');",
+                                    "    pm.expect(data).to.have.property('recentBookings');",
+                                    "    pm.expect(data).to.have.property('recentTransactions');",
+                                    "    pm.expect(data.recentBookings).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/dashboard/student",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "dashboard",
+                                "student"
+                            ]
+                        },
+                        "description": "Get student dashboard statistics"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Tutor Dashboard",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Tutor dashboard retrieved', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(200);",
+                                    "    const data = pm.response.json();",
+                                    "    pm.expect(data).to.have.property('totalMoneyEarned');",
+                                    "    pm.expect(data).to.have.property('totalStudentsWorkedWith');",
+                                    "    pm.expect(data).to.have.property('totalSessionsCompleted');",
+                                    "    pm.expect(data).to.have.property('averageRating');",
+                                    "    pm.expect(data).to.have.property('recentBookings');",
+                                    "    pm.expect(data).to.have.property('recentTransactions');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/dashboard/tutor",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "dashboard",
+                                "tutor"
+                            ]
+                        },
+                        "description": "Get tutor dashboard statistics"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Admin Dashboard",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Admin dashboard retrieved', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(200);",
+                                    "    const data = pm.response.json();",
+                                    "    pm.expect(data).to.have.property('totalUsers');",
+                                    "    pm.expect(data).to.have.property('totalStudents');",
+                                    "    pm.expect(data).to.have.property('totalTutors');",
+                                    "    pm.expect(data).to.have.property('totalBookings');",
+                                    "    pm.expect(data).to.have.property('totalRevenue');",
+                                    "    pm.expect(data).to.have.property('totalCommission');",
+                                    "    pm.expect(data).to.have.property('totalCompletedSessions');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/dashboard/admin",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "dashboard",
+                                "admin"
+                            ]
+                        },
+                        "description": "Get admin dashboard statistics (Admin only)"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Dashboard APIs for Student, Tutor, and Admin"
+        },
+        {
+            "name": "4. Reviews (COMPLETED Only)",
+            "item": [
+                {
+                    "name": "Try Review on Non-Completed (Should Fail)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Review blocked for non-completed booking', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(400);",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.message).to.include('not completed');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great session!\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/reviews/{{booking_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reviews",
+                                "{{booking_id}}"
+                            ]
+                        },
+                        "description": "Try to review a booking that is not COMPLETED. Should fail with 400."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Create Review on Completed Booking",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Review created successfully', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(201);",
+                                    "    const response = pm.response.json();",
+                                    "    pm.expect(response.success).to.be.true;",
+                                    "    pm.expect(response.review.rating).to.equal(5);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Excellent tutor! Very knowledgeable and patient.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/reviews/{{completed_booking_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reviews",
+                                "{{completed_booking_id}}"
+                            ]
+                        },
+                        "description": "Create a review for a COMPLETED booking. First complete the booking using the 'Complete Booking' endpoint."
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Tutor Reviews",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('Reviews retrieved successfully', () => {",
+                                    "    pm.expect(pm.response.code).to.equal(200);",
+                                    "    const data = pm.response.json();",
+                                    "    pm.expect(data).to.have.property('averageRating');",
+                                    "    pm.expect(data).to.have.property('totalReviews');",
+                                    "    pm.expect(data).to.have.property('reviews');",
+                                    "    pm.expect(data.reviews).to.be.an('array');",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/api/reviews/tutor/{{tutor_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "reviews",
+                                "tutor",
+                                "{{tutor_id}}"
+                            ]
+                        },
+                        "description": "Get all reviews for a specific tutor"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Review system with COMPLETED status validation"
+        },
+        {
+            "name": "0. Authentication",
+            "item": [
+                {
+                    "name": "Login as Student",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('access_token', response.accessToken);",
+                                    "    pm.environment.set('student_id', response.user._id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"student@example.com\",\n  \"password\": \"password123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Login as student to get access token"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Login as Tutor",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('access_token', response.accessToken);",
+                                    "    pm.environment.set('tutor_id', response.user._id);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"tutor@example.com\",\n  \"password\": \"password123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Login as tutor to get access token"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Login as Admin",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const response = pm.response.json();",
+                                    "    pm.environment.set('access_token', response.accessToken);",
+                                    "}"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "method": "POST",
+                        "header": [],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"password123\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "Login as admin to get access token"
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Authentication endpoints to get access tokens"
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://localhost:4000",
+            "type": "string"
+        },
+        {
+            "key": "access_token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "student_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "tutor_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "booking_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "completed_booking_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "first_booking_id",
+            "value": "",
+            "type": "string"
+        }
+    ]
+}
