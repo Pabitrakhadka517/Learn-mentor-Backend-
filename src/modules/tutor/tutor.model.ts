@@ -74,5 +74,5 @@ const availabilitySlotSchema = new Schema<IAvailabilitySlot>({
 availabilitySlotSchema.index({ tutorId: 1, startTime: 1 });
 availabilitySlotSchema.index({ isBooked: 1, startTime: 1 });
 
-export const TutorProfile = mongoose.models.TutorProfile || model<ITutorProfile>('TutorProfile', tutorProfileSchema);
-export const AvailabilitySlot = mongoose.models.AvailabilitySlot || model<IAvailabilitySlot>('AvailabilitySlot', availabilitySlotSchema);
+export const TutorProfile = mongoose.models?.TutorProfile || model<ITutorProfile>('TutorProfile', tutorProfileSchema);
+export const AvailabilitySlot = mongoose.models?.AvailabilitySlot || model<IAvailabilitySlot>('AvailabilitySlot', availabilitySlotSchema);

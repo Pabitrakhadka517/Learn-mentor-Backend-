@@ -22,4 +22,4 @@ const AnnouncementSchema: Schema = new Schema({
     expiresAt: { type: Date }
 }, { timestamps: true });
 
-export const Announcement = mongoose.models.Announcement || mongoose.model<IAnnouncement>('Announcement', AnnouncementSchema);
+export const Announcement = mongoose.models?.Announcement || mongoose.model<IAnnouncement>('Announcement', AnnouncementSchema);

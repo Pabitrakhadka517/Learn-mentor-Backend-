@@ -6,7 +6,7 @@ import multer from 'multer';
  */
 
 // File filter to accept only images
-const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter: multer.Options['fileFilter'] = (req, file, cb) => {
     // Accept only image files
     if (file.mimetype.startsWith('image/')) {
         cb(null, true);

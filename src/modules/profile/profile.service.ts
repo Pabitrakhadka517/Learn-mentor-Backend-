@@ -193,7 +193,11 @@ export class ProfileService {
         }
 
         user.theme = theme;
-        const updatedUser = await ProfileRepository.update(userId, { theme });
+        const updatedUser = await ProfileRepository.updateProfile(userId, { theme });
+
+        if (!updatedUser) {
+            throw new Error('Failed to update user theme');
+        }
 
         return this.formatProfileResponse(updatedUser);
     }

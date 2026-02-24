@@ -1,7 +1,7 @@
 import multer from 'multer';
 
 // File filter to accept PDFs and common document types
-const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter: multer.Options['fileFilter'] = (req, file, cb) => {
     const allowedMimetypes = [
         'application/pdf',
         'application/msword',

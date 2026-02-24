@@ -57,4 +57,4 @@ notificationSchema.index({ recipient: 1 });
 notificationSchema.index({ recipient: 1, isRead: 1 });
 notificationSchema.index({ createdAt: -1 });
 
-export const Notification = mongoose.models.Notification || model<INotification>('Notification', notificationSchema);
+export const Notification = mongoose.models?.Notification || model<INotification>('Notification', notificationSchema);

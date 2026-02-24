@@ -49,5 +49,5 @@ const messageSchema = new Schema<IMessage>({
 // Index for retrieving chat history
 messageSchema.index({ chatRoom: 1, createdAt: -1 });
 
-export const ChatRoom = mongoose.models.ChatRoom || model<IChatRoom>('ChatRoom', chatRoomSchema);
-export const Message = mongoose.models.Message || model<IMessage>('Message', messageSchema);
+export const ChatRoom = mongoose.models?.ChatRoom || model<IChatRoom>('ChatRoom', chatRoomSchema);
+export const Message = mongoose.models?.Message || model<IMessage>('Message', messageSchema);

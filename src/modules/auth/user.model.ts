@@ -122,6 +122,6 @@ passwordResetTokenSchema.index({ userId: 1 });
 passwordResetTokenSchema.index({ tokenHash: 1 });
 passwordResetTokenSchema.index({ expiresAt: 1 });
 
-export const User = mongoose.models.User || model<IUser>('User', userSchema);
-export const RefreshToken = mongoose.models.RefreshToken || model<IRefreshToken>('RefreshToken', refreshTokenSchema);
-export const PasswordResetToken = mongoose.models.PasswordResetToken || model<IPasswordResetToken>('PasswordResetToken', passwordResetTokenSchema);
+export const User = mongoose.models?.User || model<IUser>('User', userSchema);
+export const RefreshToken = mongoose.models?.RefreshToken || model<IRefreshToken>('RefreshToken', refreshTokenSchema);
+export const PasswordResetToken = mongoose.models?.PasswordResetToken || model<IPasswordResetToken>('PasswordResetToken', passwordResetTokenSchema);

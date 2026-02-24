@@ -37,4 +37,4 @@ const jobSchema = new Schema<IJob>({
 jobSchema.index({ sender: 1 });
 jobSchema.index({ receiver: 1 });
 
-export const Job = mongoose.models.Job || model<IJob>('Job', jobSchema);
+export const Job = mongoose.models?.Job || model<IJob>('Job', jobSchema);

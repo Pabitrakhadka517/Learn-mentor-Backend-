@@ -41,4 +41,4 @@ bookingSchema.index({ status: 1 }); // For admin dashboard
 bookingSchema.index({ createdAt: -1 }); // For recent bookings sorting
 
 
-export const Booking = mongoose.models.Booking || model<IBooking>('Booking', bookingSchema);
+export const Booking = mongoose.models?.Booking || model<IBooking>('Booking', bookingSchema);

@@ -1,9 +1,9 @@
 import request from 'supertest';
 import app from '../../src/app';
 import { User } from '../../src/modules/auth/user.model';
+import { AuthRepository } from '../../src/modules/auth/auth.repository';
 import { Announcement } from '../../src/modules/admin/announcement.model';
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 
 describe('Special Features & Announcements Integration Tests', () => {
     let adminToken: string;
@@ -11,7 +11,7 @@ describe('Special Features & Announcements Integration Tests', () => {
     let adminId: string;
 
     beforeEach(async () => {
-        const password = await bcrypt.hash('Password123!', 10);
+        const password = await AuthRepository.hashPassword('Password123!');
 
         // Create Admin
         const admin = await User.create({
@@ -26,7 +26,14 @@ describe('Special Features & Announcements Integration Tests', () => {
         const adminLogin = await request(app)
             .post('/api/auth/login')
             .send({ email: 'admin_test@example.com', password: 'Password123!' });
-        adminToken = adminLogin.body.accessToken;
+        adminToken = adminLogin.body?.accessToken;
+
+        if (!adminToken) {
+            console.error('FAILED TO LOGIN ADMIN');
+            console.error('Admin login status:', adminLogin.status);
+            console.error('Admin login body:', JSON.stringify(adminLogin.body, null, 2));
+            throw new Error(`Admin login failed: ${adminLogin.body?.message || 'Unknown error'}`);
+        }
 
         // Create Student
         await User.create({
@@ -40,12 +47,13 @@ describe('Special Features & Announcements Integration Tests', () => {
         const studentLogin = await request(app)
             .post('/api/auth/login')
             .send({ email: 'student_test@example.com', password: 'Password123!' });
-        studentToken = studentLogin.body.accessToken;
+        studentToken = studentLogin.body?.accessToken;
 
-        if (!adminToken || !studentToken) {
-            console.error('FAILED TO OBTAIN TOKENS IN BEFOREEACH');
-            console.error('Admin response:', adminLogin.body);
-            console.error('Student response:', studentLogin.body);
+        if (!studentToken) {
+            console.error('FAILED TO LOGIN STUDENT');
+            console.error('Student login status:', studentLogin.status);
+            console.error('Student login body:', JSON.stringify(studentLogin.body, null, 2));
+            throw new Error(`Student login failed: ${studentLogin.body?.message || 'Unknown error'}`);
         }
     });
 

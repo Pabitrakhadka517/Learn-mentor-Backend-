@@ -1,0 +1,210 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TutorService = void 0;
+const tutor_model_1 = require("./tutor.model");
+const mongoose_1 = require("mongoose");
+class TutorService {
+    static async getTutors(query) {
+        const { subject, minPrice, maxPrice, language, availability, search, sortBy, page, limit, verifiedOnly } = query;
+        const pipeline = [];
+        const matchStage = {
+            verificationStatus: verifiedOnly ? 'VERIFIED' : { $in: ['VERIFIED', 'PENDING'] }
+        };
+        if (subject) {
+            matchStage.subjects = { $in: [new RegExp(subject, 'i')] };
+        }
+        if (language) {
+            matchStage.languages = { $in: [new RegExp(language, 'i')] };
+        }
+        if (minPrice !== undefined || maxPrice !== undefined) {
+            matchStage.hourlyRate = {};
+            if (minPrice !== undefined)
+                matchStage.hourlyRate.$gte = minPrice;
+            if (maxPrice !== undefined)
+                matchStage.hourlyRate.$lte = maxPrice;
+        }
+        pipeline.push({ $match: matchStage });
+        pipeline.push({
+            $lookup: {
+                from: 'users',
+                localField: 'user',
+                foreignField: '_id',
+                as: 'userDetails'
+            }
+        });
+        pipeline.push({
+            $unwind: {
+                path: '$userDetails',
+                preserveNullAndEmptyArrays: true
+            }
+        });
+        if (search) {
+            const regex = new RegExp(search, 'i');
+            pipeline.push({
+                $match: {
+                    $or: [
+                        { 'userDetails.fullName': { $regex: regex } },
+                        { bio: { $regex: regex } },
+                        { subjects: { $in: [regex] } }
+                    ]
+                }
+            });
+        }
+        const now = new Date();
+        pipeline.push({
+            $lookup: {
+                from: 'availabilityslots',
+                let: { tutorId: '$user' },
+                pipeline: [
+                    {
+                        $match: {
+                            $expr: {
+                                $and: [
+                                    { $eq: ['$tutorId', '$$tutorId'] },
+                                    { $eq: ['$isBooked', false] },
+                                    { $gt: ['$startTime', now] }
+                                ]
+                            }
+                        }
+                    },
+                    { $sort: { startTime: 1 } },
+                    { $limit: 1 }
+                ],
+                as: 'nextSlot'
+            }
+        });
+        if (availability) {
+            pipeline.push({
+                $match: {
+                    'nextSlot': { $ne: [] }
+                }
+            });
+        }
+        pipeline.push({
+            $addFields: {
+                nextAvailableSlot: { $arrayElemAt: ['$nextSlot', 0] }
+            }
+        });
+        pipeline.push({
+            $project: {
+                _id: '$user',
+                profileId: '$_id',
+                fullName: '$userDetails.fullName',
+                profileImage: '$userDetails.profileImage',
+                bio: 1,
+                experienceYears: 1,
+                hourlyRate: 1,
+                languages: 1,
+                subjects: 1,
+                rating: { $ifNull: ['$averageRating', 0] },
+                reviewCount: { $ifNull: ['$totalReviews', 0] },
+                averageRating: 1,
+                totalReviews: 1,
+                verificationStatus: 1,
+                nextAvailableSlot: { $ifNull: ['$nextAvailableSlot', null] },
+                createdAt: 1
+            }
+        });
+        let sortStage = {};
+        if (sortBy === 'price_asc') {
+            sortStage = { hourlyRate: 1 };
+        }
+        else if (sortBy === 'price_desc') {
+            sortStage = { hourlyRate: -1 };
+        }
+        else if (sortBy === 'rating') {
+            sortStage = { averageRating: -1, totalReviews: -1 };
+        }
+        else {
+            sortStage = { averageRating: -1, totalReviews: -1 };
+        }
+        pipeline.push({ $sort: sortStage });
+        pipeline.push({
+            $facet: {
+                metadata: [{ $count: 'total' }],
+                data: [{ $skip: (page - 1) * limit }, { $limit: limit }]
+            }
+        });
+        const result = await tutor_model_1.TutorProfile.aggregate(pipeline);
+        const metadata = result[0].metadata[0];
+        const total = metadata ? metadata.total : 0;
+        const tutors = result[0].data;
+        return {
+            tutors,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        };
+    }
+    static async getTutorById(tutorId) {
+        if (!mongoose_1.Types.ObjectId.isValid(tutorId)) {
+            throw new Error('Tutor not found');
+        }
+        let tutor = await tutor_model_1.TutorProfile.findById(tutorId)
+            .populate('user', 'fullName email profileImage phone location')
+            .lean();
+        if (!tutor) {
+            tutor = await tutor_model_1.TutorProfile.findOne({ user: tutorId })
+                .populate('user', 'fullName email profileImage phone location')
+                .lean();
+        }
+        if (!tutor) {
+            throw new Error('Tutor not found');
+        }
+        if (tutor.verificationStatus === 'REJECTED') {
+            throw new Error('Tutor profile is not available');
+        }
+        const now = new Date();
+        const slots = await tutor_model_1.AvailabilitySlot.find({
+            tutorId: tutor.user._id,
+            startTime: { $gt: now },
+            isBooked: false
+        })
+            .sort({ startTime: 1 })
+            .limit(20)
+            .lean();
+        return {
+            ...tutor,
+            _id: tutor.user._id,
+            profileId: tutor._id,
+            fullName: tutor.user.fullName,
+            email: tutor.user.email,
+            profileImage: tutor.user.profileImage,
+            availableSlots: slots
+        };
+    }
+    static async getAvailabilitySlots(tutorId, startDate, endDate) {
+        const query = { tutorId: new mongoose_1.Types.ObjectId(tutorId) };
+        if (startDate || endDate) {
+            query.startTime = {};
+            if (startDate)
+                query.startTime.$gte = startDate;
+            if (endDate)
+                query.startTime.$lte = endDate;
+        }
+        return await tutor_model_1.AvailabilitySlot.find(query).sort({ startTime: 1 }).lean();
+    }
+    static async setAvailabilitySlots(tutorId, slots) {
+        const tid = new mongoose_1.Types.ObjectId(tutorId);
+        const now = new Date();
+        await tutor_model_1.AvailabilitySlot.deleteMany({
+            tutorId: tid,
+            startTime: { $gt: now },
+            isBooked: false
+        });
+        if (slots.length > 0) {
+            const slotsToInsert = slots.map(slot => ({
+                tutorId: tid,
+                startTime: new Date(slot.startTime),
+                endTime: new Date(slot.endTime),
+                isBooked: false
+            }));
+            await tutor_model_1.AvailabilitySlot.insertMany(slotsToInsert);
+        }
+    }
+    static async submitVerification(tutorId) {
+        await tutor_model_1.TutorProfile.findOneAndUpdate({ user: new mongoose_1.Types.ObjectId(tutorId) }, { verificationStatus: 'PENDING' }, { upsert: true });
+    }
+}
+exports.TutorService = TutorService;
+//# sourceMappingURL=tutor.service.js.map

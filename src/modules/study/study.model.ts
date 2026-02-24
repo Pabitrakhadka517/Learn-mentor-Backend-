@@ -32,4 +32,4 @@ const studyResourceSchema = new Schema<IStudyResource>({
 studyResourceSchema.index({ category: 1, isPublic: 1 });
 studyResourceSchema.index({ tutor: 1 });
 
-export const StudyResource = mongoose.models.StudyResource || model<IStudyResource>('StudyResource', studyResourceSchema);
+export const StudyResource = mongoose.models?.StudyResource || model<IStudyResource>('StudyResource', studyResourceSchema);

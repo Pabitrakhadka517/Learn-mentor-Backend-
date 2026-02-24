@@ -44,4 +44,4 @@ reviewSchema.index({ tutor: 1 });
 reviewSchema.index({ student: 1 });
 // booking already has a unique index via schema definition
 
-export const Review = mongoose.models.Review || model<IReview>('Review', reviewSchema);
+export const Review = mongoose.models?.Review || model<IReview>('Review', reviewSchema);

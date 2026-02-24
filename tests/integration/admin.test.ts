@@ -1,16 +1,16 @@
 import request from 'supertest';
 import app from '../../src/app';
 import { User } from '../../src/modules/auth/user.model';
+import { AuthRepository } from '../../src/modules/auth/auth.repository';
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 
 describe('Admin Integration Tests', () => {
     let adminToken: string;
     let adminId: string;
 
     beforeEach(async () => {
-        // Create an admin user manually since registration doesn't allow it
-        const passwordHash = await bcrypt.hash('AdminPass123!', 10);
+        // Create an admin user using AuthRepository which handles password hashing
+        const passwordHash = await AuthRepository.hashPassword('AdminPass123!');
         const admin = await User.create({
             email: 'admin@example.com',
             passwordHash,
@@ -25,7 +25,14 @@ describe('Admin Integration Tests', () => {
             .post('/api/auth/login')
             .send({ email: 'admin@example.com', password: 'AdminPass123!' });
 
-        adminToken = loginRes.body.accessToken;
+        adminToken = loginRes.body?.accessToken;
+        
+        if (!adminToken) {
+            console.error('FAILED TO LOGIN ADMIN');
+            console.error('Login status:', loginRes.status);
+            console.error('Login body:', JSON.stringify(loginRes.body, null, 2));
+            throw new Error(`Admin login failed: ${loginRes.body?.message || 'Unknown error'}`);
+        }
 
         // Seed some students only for the users collection tests
         // Actually it's cleaner to seed inside the describe block if needed, 

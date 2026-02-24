@@ -75,4 +75,4 @@ transactionSchema.index({ sender: 1 });
 transactionSchema.index({ receiver: 1 });
 transactionSchema.index({ job: 1 });
 
-export const Transaction = mongoose.models.Transaction || model<ITransaction>('Transaction', transactionSchema);
+export const Transaction = mongoose.models?.Transaction || model<ITransaction>('Transaction', transactionSchema);
