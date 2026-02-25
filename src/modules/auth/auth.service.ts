@@ -104,6 +104,16 @@ export class AuthService {
       throw new Error('Invalid credentials');
     }
 
+    // Validate role if expectedRole is provided (role-based login enforcement)
+    if (validated.expectedRole && user.role !== validated.expectedRole) {
+      const roleLabel = validated.expectedRole === 'STUDENT' ? 'Student' : validated.expectedRole === 'TUTOR' ? 'Tutor' : 'Admin';
+      const actualLabel = user.role === 'STUDENT' ? 'Student' : user.role === 'TUTOR' ? 'Tutor' : 'Admin';
+      throw Object.assign(
+        new Error(`This account is registered as a ${actualLabel}. Please use the ${actualLabel} login page instead.`),
+        { statusCode: 403 }
+      );
+    }
+
     // Generate tokens
     const { accessToken, refreshToken } = await this.generateTokens(user._id.toString(), user.role, user.email);
 

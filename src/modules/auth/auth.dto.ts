@@ -20,6 +20,7 @@ export type RegisterDTO = z.infer<typeof RegisterDTOSchema>;
 export const LoginDTOSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(1, 'Password is required'),
+  expectedRole: z.enum(['STUDENT', 'TUTOR', 'ADMIN']).optional(),
 });
 
 export type LoginDTO = z.infer<typeof LoginDTOSchema>;

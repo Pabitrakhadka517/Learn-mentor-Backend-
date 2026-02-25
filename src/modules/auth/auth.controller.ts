@@ -54,6 +54,16 @@ export class AuthController {
    */
   static async login(req: Request, res: Response) {
     try {
+      // Normalize expectedRole from request body
+      if (req.body.expectedRole) {
+        const roleMap: Record<string, string> = {
+          student: 'STUDENT', user: 'STUDENT', STUDENT: 'STUDENT',
+          tutor: 'TUTOR', TUTOR: 'TUTOR',
+          admin: 'ADMIN', ADMIN: 'ADMIN',
+        };
+        req.body.expectedRole = roleMap[req.body.expectedRole] || req.body.expectedRole;
+      }
+
       const result = await AuthService.login(req.body);
 
       res.status(200).json({
@@ -72,7 +82,9 @@ export class AuthController {
         });
       }
 
-      res.status(401).json({
+      // Use statusCode from the error if available (e.g., 403 for role mismatch)
+      const statusCode = error.statusCode || 401;
+      res.status(statusCode).json({
         success: false,
         message: error.message || 'Login failed',
       });
