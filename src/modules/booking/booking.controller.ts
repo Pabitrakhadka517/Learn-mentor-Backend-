@@ -101,7 +101,8 @@ export class BookingController {
                 price: price,
                 notes: notes,
                 status: 'PENDING',
-                paymentStatus: 'UNPAID'
+                sessionStatus: 'booked',
+                paymentStatus: 'pending'
             });
 
             await booking.save();
@@ -157,9 +158,16 @@ export class BookingController {
                 return res.status(403).json({ message: 'Unauthorized action on booking' });
             }
 
+            const updateQuery: any = { $set: { status } };
+            if (status === 'CONFIRMED' || status === 'ACCEPTED') {
+                updateQuery.$set.sessionStatus = 'confirmed';
+            } else if (status === 'REJECTED') {
+                updateQuery.$set.sessionStatus = 'cancelled';
+            }
+
             const updatedBooking = await Booking.findByIdAndUpdate(
                 bookingId,
-                { $set: { status } },
+                updateQuery,
                 { new: true, runValidators: false } // Avoid 'startTime' required bug
             );
 
@@ -236,12 +244,20 @@ export class BookingController {
                 return res.status(403).json({ message: 'Unauthorized: Only parties involved in the booking can complete it' });
             }
 
-            if (booking.status !== 'PAID' && booking.status !== 'CONFIRMED') {
-                return res.status(400).json({ message: 'Booking must be PAID or CONFIRMED to complete' });
+            if (booking.paymentStatus !== 'paid') {
+                return res.status(400).json({ 
+                    message: 'Payment has not been completed for this session. Please pay first.',
+                    requiresPayment: true 
+                });
             }
 
             const updatedBooking = await Booking.findByIdAndUpdate(id,
-                { $set: { status: 'COMPLETED' } },
+                { 
+                    $set: { 
+                        status: 'COMPLETED',
+                        sessionStatus: 'completed' 
+                    } 
+                },
                 { new: true, runValidators: false }
             );
 
@@ -288,7 +304,12 @@ export class BookingController {
             }
 
             const updatedBooking = await Booking.findByIdAndUpdate(id,
-                { $set: { status: 'CANCELLED' } },
+                { 
+                    $set: { 
+                        status: 'CANCELLED',
+                        sessionStatus: 'cancelled'
+                    } 
+                },
                 { new: true, runValidators: false }
             );
 

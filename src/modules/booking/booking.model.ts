@@ -1,15 +1,18 @@
 import mongoose, { Schema, model, Document, Types } from 'mongoose';
 
+export type SessionStatus = 'booked' | 'confirmed' | 'completed' | 'cancelled';
+export type PaymentStatus = 'pending' | 'paid' | 'failed';
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'PAID' | 'COMPLETED' | 'CANCELLED';
 
 export interface IBooking extends Document {
     student: Types.ObjectId;
     tutor: Types.ObjectId;
-    status: BookingStatus;
-    paymentStatus: 'UNPAID' | 'DONE';
+    status: string; // Keeping for compatibility or we can migrate
+    sessionStatus: SessionStatus;
+    paymentStatus: PaymentStatus;
     startTime: Date;
-    endTime: Date; // Added for overlap check
-    price: number; // For revenue calculation
+    endTime: Date;
+    price: number;
     notes?: string;
     createdAt: Date;
     updatedAt: Date;
@@ -20,17 +23,22 @@ const bookingSchema = new Schema<IBooking>({
     tutor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     status: {
         type: String,
-        enum: ['PENDING', 'CONFIRMED', 'ACCEPTED', 'REJECTED', 'PAID', 'COMPLETED', 'CANCELLED'],
         default: 'PENDING'
+    },
+    sessionStatus: {
+        type: String,
+        enum: ['booked', 'confirmed', 'completed', 'cancelled'],
+        default: 'booked'
     },
     startTime: { type: Date, required: true },
     endTime: { type: Date, required: true },
     price: { type: Number, required: true },
     paymentStatus: {
         type: String,
-        enum: ['UNPAID', 'DONE'],
-        default: 'UNPAID'
-    }
+        enum: ['pending', 'paid', 'failed'],
+        default: 'pending'
+    },
+    notes: { type: String }
 }, { timestamps: true });
 
 // Indexes for optimized queries

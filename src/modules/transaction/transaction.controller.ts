@@ -191,6 +191,31 @@ export const payTransaction = async (req: AuthRequest, res: Response) => {
 
         const amountFromDB = transaction.amount;
 
+        // --- Server-side eSewa Verification ---
+        try {
+            const esewaStatusUrl = `https://rc-epay.esewa.com.np/api/epay/transaction/status/v2?product_code=${transaction.productCode}&total_amount=${amountFromDB}&transaction_uuid=${transaction.transactionUuid}`;
+            
+            const esewaResponse = await fetch(esewaStatusUrl);
+            const esewaData = await esewaResponse.json();
+
+            if (esewaData.status !== 'COMPLETE') {
+                if (transaction.booking) {
+                    await Booking.findByIdAndUpdate(transaction.booking._id, { paymentStatus: 'failed' });
+                }
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Payment verification failed. eSewa status: ${esewaData.status || 'Unknown'}` 
+                });
+            }
+            // If we are here, eSewa has confirmed the payment
+        } catch (verifyError: any) {
+            console.error('eSewa verification request failed', verifyError);
+            if (transaction.booking) {
+                await Booking.findByIdAndUpdate(transaction.booking._id, { paymentStatus: 'failed' });
+            }
+            return res.status(500).json({ success: false, message: 'Failed to verify payment with eSewa. Please try again later.' });
+        }
+
         // Commission logic
         const commissionRate = 0.1; // 10%
         const commission = amountFromDB * commissionRate;
@@ -215,7 +240,7 @@ export const payTransaction = async (req: AuthRequest, res: Response) => {
         if (transaction.job) {
             await Job.findByIdAndUpdate(
                 transaction.job._id,
-                { paymentStatus: 'done' }
+                { paymentStatus: 'paid' }
             );
         }
 
@@ -223,7 +248,7 @@ export const payTransaction = async (req: AuthRequest, res: Response) => {
             await Booking.findByIdAndUpdate(
                 transaction.booking._id,
                 {
-                    paymentStatus: 'DONE',
+                    paymentStatus: 'paid',
                     status: 'PAID'
                 }
             );
