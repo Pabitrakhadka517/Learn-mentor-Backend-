@@ -14,10 +14,17 @@ export interface IChatRoom extends Document {
 export interface IMessage extends Document {
     chatRoom: Types.ObjectId;
     sender: Types.ObjectId;
+    receiver: Types.ObjectId;
+    messageType: 'text' | 'image' | 'file';
     message: string;
+    fileUrl?: string;
+    fileName?: string;
     attachments?: string[];
     isRead: boolean;
+    isEdited: boolean;
+    isDeleted: boolean;
     createdAt: Date;
+    updatedAt: Date;
 }
 
 const chatRoomSchema = new Schema<IChatRoom>({
@@ -41,9 +48,15 @@ chatRoomSchema.index({ student: 1, tutor: 1, booking: 1 }, { unique: true, spars
 const messageSchema = new Schema<IMessage>({
     chatRoom: { type: Schema.Types.ObjectId, ref: 'ChatRoom', required: true },
     sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    message: { type: String, required: true },
-    attachments: [{ type: String }], // URLs to stored files
-    isRead: { type: Boolean, default: false }
+    receiver: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    messageType: { type: String, enum: ['text', 'image', 'file'], default: 'text' },
+    message: { type: String, required: function() { return !this.isDeleted && this.messageType === 'text'; } },
+    fileUrl: { type: String },
+    fileName: { type: String },
+    attachments: [{ type: String }], // Keeping for backward compatibility or multiple files
+    isRead: { type: Boolean, default: false },
+    isEdited: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // Index for retrieving chat history

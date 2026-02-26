@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ChatController } from './chat.controller';
 import { authenticate } from '../auth/auth.middleware';
+import { uploadChatAttachment } from './chat.middleware';
 
 /**
  * @swagger
@@ -12,6 +13,26 @@ const router = Router();
 
 // Protect all chat routes
 router.use(authenticate);
+
+/**
+ * @swagger
+ * /api/chats/{id}:
+ *   delete:
+ *     summary: Delete/Hide a conversation
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Chat deactivated
+ */
+router.delete('/:id', ChatController.deleteChat);
 
 /**
  * @swagger
@@ -166,8 +187,61 @@ router.post('/', ChatController.createChat);
  *       404:
  *         description: Chat not found
  */
-router.post('/:id/messages', ChatController.sendMessage);
+router.post('/:id/messages', uploadChatAttachment, ChatController.sendMessage);
 router.get('/:id/messages', ChatController.getMessages);
+
+/**
+ * @swagger
+ * /api/chats/messages/{messageId}:
+ *   patch:
+ *     summary: Edit a message (Only sender can edit)
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Message updated
+ *       400:
+ *         description: Invalid request/Permission denied
+ */
+router.patch('/messages/:messageId', authenticate, ChatController.editMessage);
+
+/**
+ * @swagger
+ * /api/chats/messages/{messageId}:
+ *   delete:
+ *     summary: Delete a message (Only sender can delete)
+ *     tags: [Chat]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: messageId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Message deleted
+ *       400:
+ *         description: Invalid request/Permission denied
+ */
+router.delete('/messages/:messageId', authenticate, ChatController.deleteMessage);
 
 /**
  * @swagger

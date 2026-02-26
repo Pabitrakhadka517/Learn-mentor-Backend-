@@ -91,10 +91,7 @@ export const initSocket = (httpServer: HttpServer) => {
                 // Use Service to persist message and validate business logic (booking status)
                 // Service also emits 'receive_message' to the room
                 try {
-                    // Note: createMessage emits to room via io instance if available
-                    // But socket.to(room) excludes sender. io.to(room) includes everyone.
-                    // ChatService uses io.to().
-                    const message = await ChatService.sendMessage(chatId, userId, content, attachments);
+                    const message = await ChatService.sendMessage(chatId, userId, { content, attachments });
 
                     // Acknowledge sender
                     socket.emit('message_sent', { success: true, messageId: message._id });

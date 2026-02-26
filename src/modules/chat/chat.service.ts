@@ -110,8 +110,13 @@ export class ChatService {
     static async sendMessage(
         chatId: string,
         senderId: string,
-        content: string,
-        attachments: string[] = []
+        data: {
+            content?: string;
+            messageType?: 'text' | 'image' | 'file';
+            fileUrl?: string;
+            fileName?: string;
+            attachments?: string[];
+        }
     ) {
         // 1. Verify User Access & Chat Status
         const chat = await ChatRoom.findOne({
@@ -124,26 +129,34 @@ export class ChatService {
             throw new Error('Chat room not active or access denied');
         }
 
+        // 2. Identify Receiver
+        const receiverId = chat.student.toString() === senderId.toString() ? chat.tutor : chat.student;
+
         // 3. Create Message
         const message = await Message.create({
             chatRoom: chatId,
             sender: senderId,
-            message: content,
-            attachments,
+            receiver: receiverId,
+            messageType: data.messageType || 'text',
+            message: data.content || '',
+            fileUrl: data.fileUrl,
+            fileName: data.fileName,
+            attachments: data.attachments || [],
             isRead: false
         });
 
         // 4. Update Chat Room (Last Message)
-        chat.lastMessage = content;
+        chat.lastMessage = data.messageType === 'text' ? data.content : `Shared a ${data.messageType}`;
         chat.lastMessageAt = new Date();
         await chat.save();
 
         // 5. Emit Socket Event (Real-time)
+        const populatedMessage = await message.populate('sender', 'fullName profileImage');
         if (ioInstance) {
-            ioInstance.to(chatId).emit('receive_message', await message.populate('sender', 'fullName profileImage'));
+            ioInstance.to(chatId).emit('receive_message', populatedMessage);
         }
 
-        return message;
+        return populatedMessage;
     }
 
     /**
@@ -159,6 +172,68 @@ export class ChatService {
         );
 
         return result.modifiedCount;
+    }
+
+    /**
+     * Edit an existing message
+     */
+    static async editMessage(messageId: string, senderId: string, newContent: string) {
+        const message = await Message.findOne({ _id: messageId, sender: senderId, isDeleted: false });
+        if (!message) throw new Error('Message not found or you do not have permission.');
+
+        if (message.messageType !== 'text') throw new Error('Only text messages can be edited.');
+
+        message.message = newContent;
+        message.isEdited = true;
+        await message.save();
+
+        // 4. Update Chat Room if it was the last message
+        const chat = await ChatRoom.findById(message.chatRoom);
+        if (chat && chat.lastMessageAt?.getTime() === message.createdAt.getTime()) {
+            chat.lastMessage = newContent;
+            await chat.save();
+        }
+
+        if (ioInstance) {
+            ioInstance.to(message.chatRoom.toString()).emit('message_edited', {
+                messageId: message._id,
+                chatRoom: message.chatRoom,
+                newContent,
+                updatedAt: message.updatedAt
+            });
+        }
+
+        return await message.populate('sender', 'fullName profileImage');
+    }
+
+    /**
+     * Delete a message (Soft Delete)
+     */
+    static async deleteMessage(messageId: string, senderId: string) {
+        const message = await Message.findOne({ _id: messageId, sender: senderId, isDeleted: false });
+        if (!message) throw new Error('Message not found or permission denied.');
+
+        message.isDeleted = true;
+        message.message = 'This message was deleted';
+        message.fileUrl = undefined;
+        message.fileName = undefined;
+        await message.save();
+
+        // Update last message in chat if needed
+        const chat = await ChatRoom.findById(message.chatRoom);
+        if (chat && chat.lastMessageAt?.getTime() === message.createdAt.getTime()) {
+            chat.lastMessage = 'This message was deleted';
+            await chat.save();
+        }
+
+        if (ioInstance) {
+            ioInstance.to(message.chatRoom.toString()).emit('message_deleted', {
+                messageId: message._id,
+                chatRoom: message.chatRoom
+            });
+        }
+
+        return await message.populate('sender', 'fullName profileImage');
     }
 
     /**
@@ -210,7 +285,9 @@ export class ChatService {
         if (msgCount === 0) {
             await Message.create({
                 chatRoom: chat._id,
-                sender: booking.tutor._id, // Set tutor or a system ID as sender
+                sender: booking.tutor._id,
+                receiver: booking.student._id,
+                messageType: 'text',
                 message: initialContent,
                 isRead: false
             });
@@ -220,6 +297,22 @@ export class ChatService {
             await chat.save();
         }
 
+        return chat;
+    }
+
+    /**
+     * Deactivate a specific chat manually
+     */
+    static async deleteChat(chatId: string, userId: string) {
+        const chat = await ChatRoom.findOne({
+            _id: chatId,
+            $or: [{ student: userId }, { tutor: userId }]
+        });
+
+        if (!chat) throw new Error('Chat not found or access denied');
+
+        chat.isActive = false;
+        await chat.save();
         return chat;
     }
 
