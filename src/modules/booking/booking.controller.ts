@@ -244,7 +244,8 @@ export class BookingController {
                 return res.status(403).json({ message: 'Unauthorized: Only parties involved in the booking can complete it' });
             }
 
-            if (booking.paymentStatus !== 'paid') {
+            // Accept either paymentStatus='paid' or status='PAID' as proof of payment
+            if (booking.paymentStatus !== 'paid' && booking.status !== 'PAID') {
                 return res.status(400).json({ 
                     message: 'Payment has not been completed for this session. Please pay first.',
                     requiresPayment: true 
@@ -255,7 +256,8 @@ export class BookingController {
                 { 
                     $set: { 
                         status: 'COMPLETED',
-                        sessionStatus: 'completed' 
+                        sessionStatus: 'completed',
+                        paymentStatus: 'paid' // Ensure consistency
                     } 
                 },
                 { new: true, runValidators: false }
