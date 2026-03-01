@@ -57,6 +57,7 @@ export class AuthController {
       // Normalize expectedRole from request body
       if (req.body.expectedRole) {
         const roleMap: Record<string, string> = {
+          USER: 'STUDENT',
           student: 'STUDENT', user: 'STUDENT', STUDENT: 'STUDENT',
           tutor: 'TUTOR', TUTOR: 'TUTOR',
           admin: 'ADMIN', ADMIN: 'ADMIN',

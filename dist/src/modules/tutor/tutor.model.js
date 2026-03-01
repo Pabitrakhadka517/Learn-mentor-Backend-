@@ -75,6 +75,7 @@ const availabilitySlotSchema = new mongoose_1.Schema({
 }, { timestamps: true });
 availabilitySlotSchema.index({ tutorId: 1, startTime: 1 });
 availabilitySlotSchema.index({ isBooked: 1, startTime: 1 });
+availabilitySlotSchema.index({ tutorId: 1, startTime: 1, endTime: 1 }, { unique: true });
 exports.TutorProfile = mongoose_1.default.models?.TutorProfile || (0, mongoose_1.model)('TutorProfile', tutorProfileSchema);
 exports.AvailabilitySlot = mongoose_1.default.models?.AvailabilitySlot || (0, mongoose_1.model)('AvailabilitySlot', availabilitySlotSchema);
 //# sourceMappingURL=tutor.model.js.map

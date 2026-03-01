@@ -3,6 +3,7 @@ import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
 import { ChatRoom } from './modules/chat/chat.model';
 import { ChatService } from './modules/chat/chat.service';
+import { jwtConfig } from './config/jwt';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -28,7 +29,7 @@ export const initSocket = (httpServer: HttpServer) => {
                 return next(new Error('Authentication error: Token required'));
             }
 
-            const decoded: any = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'fallback_secret');
+            const decoded: any = jwt.verify(token, jwtConfig.accessSecret);
             socket.data.user = decoded; // { userId, role, email }
             next();
         } catch (err) {
@@ -78,6 +79,21 @@ export const initSocket = (httpServer: HttpServer) => {
             } catch (error) {
                 console.error('Join room error:', error);
                 socket.emit('error', { message: 'Failed to join room' });
+            }
+        });
+
+        socket.on('join_tutor_availability', (data: { tutorId: string }) => {
+            try {
+                const tutorId = data?.tutorId;
+                if (!tutorId) {
+                    return;
+                }
+
+                const room = `availability:${tutorId}`;
+                socket.join(room);
+                socket.emit('joined_tutor_availability', { tutorId });
+            } catch (error) {
+                console.error('Join tutor availability room error:', error);
             }
         });
 

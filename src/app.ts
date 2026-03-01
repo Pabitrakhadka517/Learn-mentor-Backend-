@@ -20,6 +20,7 @@ import studyRoutes from "./modules/study/study.routes";
 
 
 const app = express();
+const env = process.env as Record<string, string | undefined>;
 
 // Security Middlewares
 app.use(helmet()); // Adds security headers
@@ -29,15 +30,15 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     // In development, allow any localhost origin (Flutter web uses random ports)
-    if (process.env.NODE_ENV !== 'production') {
+    if (env.NODE_ENV !== 'production') {
       if (/^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
         return callback(null, true);
       }
     }
     
     // Check against allowed origins from env
-    const allowedOrigins = process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+    const allowedOrigins = env.CORS_ORIGIN
+      ? env.CORS_ORIGIN.split(',').map((o: string) => o.trim())
       : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
     
     if (allowedOrigins.includes(origin)) {
@@ -67,13 +68,35 @@ app.use((req, res, next) => {
 });
 
 // Swagger setup
-/*
 const swaggerOptions: swaggerJsdoc.Options = {
-    // ... items ...
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "LearnMentor API",
+      version: "1.0.0",
+      description: "API documentation for LearnMentor platform",
+    },
+    servers: [
+      {
+        url: env.NODE_ENV === "production"
+          ? env.API_URL || "http://localhost:5000"
+          : `http://localhost:${env.PORT || 5000}`,
+      },
+    ],
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+        },
+      },
+    },
+  },
+  apis: ["./src/modules/**/*.routes.ts"],
 };
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use("/swagger", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-*/
 
 // API Routes
 app.use("/api/auth", authRoutes);

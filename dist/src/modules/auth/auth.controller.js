@@ -44,6 +44,15 @@ class AuthController {
     }
     static async login(req, res) {
         try {
+            if (req.body.expectedRole) {
+                const roleMap = {
+                    USER: 'STUDENT',
+                    student: 'STUDENT', user: 'STUDENT', STUDENT: 'STUDENT',
+                    tutor: 'TUTOR', TUTOR: 'TUTOR',
+                    admin: 'ADMIN', ADMIN: 'ADMIN',
+                };
+                req.body.expectedRole = roleMap[req.body.expectedRole] || req.body.expectedRole;
+            }
             const result = await auth_service_1.AuthService.login(req.body);
             res.status(200).json({
                 success: true,
@@ -61,7 +70,8 @@ class AuthController {
                     })),
                 });
             }
-            res.status(401).json({
+            const statusCode = error.statusCode || 401;
+            res.status(statusCode).json({
                 success: false,
                 message: error.message || 'Login failed',
             });

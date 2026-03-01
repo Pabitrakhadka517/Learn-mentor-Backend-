@@ -67,6 +67,7 @@ class EmailService {
     static async sendPasswordResetEmail(to, token, frontendUrl) {
         const baseUrl = frontendUrl || process.env.FRONTEND_URL || 'http://localhost:3000';
         const resetLink = `${baseUrl}/reset-password?token=${token}`;
+        const mobileLink = `learnmentor://reset-password?token=${token}`;
         const subject = 'Password Reset Request - LearnMentor';
         const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background: #0f172a; color: #e2e8f0;">
@@ -78,7 +79,12 @@ class EmailService {
         <p style="color: #94a3b8;">You requested a password reset for your LearnMentor account. Click the button below to set a new password. This link will expire in <strong style="color: #f1f5f9;">15 minutes</strong>.</p>
         <div style="text-align: center; margin: 32px 0;">
           <a href="${resetLink}" style="background: linear-gradient(135deg, #6366f1, #4f46e5); color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px; display: inline-block;">
-            Reset My Password
+            Reset My Password (Web)
+          </a>
+        </div>
+        <div style="text-align: center; margin: 16px 0;">
+          <a href="${mobileLink}" style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block;">
+            Open in App
           </a>
         </div>
         <p style="color: #64748b; font-size: 13px;">Or copy and paste this link into your browser:</p>

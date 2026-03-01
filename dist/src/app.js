@@ -6,6 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
+const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
+const swagger_jsdoc_1 = __importDefault(require("swagger-jsdoc"));
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const profile_routes_1 = __importDefault(require("./modules/profile/profile.routes"));
 const admin_routes_1 = __importDefault(require("./modules/admin/admin.routes"));
@@ -19,9 +21,25 @@ const errorHandler_1 = require("./middleware/errorHandler");
 const transaction_routes_1 = __importDefault(require("./modules/transaction/transaction.routes"));
 const study_routes_1 = __importDefault(require("./modules/study/study.routes"));
 const app = (0, express_1.default)();
+const env = process.env;
 app.use((0, helmet_1.default)());
 app.use((0, cors_1.default)({
-    origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+    origin: function (origin, callback) {
+        if (!origin)
+            return callback(null, true);
+        if (env.NODE_ENV !== 'production') {
+            if (/^https?:\/\/localhost(:\d+)?$/.test(origin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) {
+                return callback(null, true);
+            }
+        }
+        const allowedOrigins = env.CORS_ORIGIN
+            ? env.CORS_ORIGIN.split(',').map((o) => o.trim())
+            : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'];
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
@@ -37,6 +55,35 @@ app.use((req, res, next) => {
     }
     next();
 });
+const swaggerOptions = {
+    definition: {
+        openapi: "3.0.0",
+        info: {
+            title: "LearnMentor API",
+            version: "1.0.0",
+            description: "API documentation for LearnMentor platform",
+        },
+        servers: [
+            {
+                url: env.NODE_ENV === "production"
+                    ? env.API_URL || "http://localhost:5000"
+                    : `http://localhost:${env.PORT || 5000}`,
+            },
+        ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: "http",
+                    scheme: "bearer",
+                    bearerFormat: "JWT",
+                },
+            },
+        },
+    },
+    apis: ["./src/modules/**/*.routes.ts"],
+};
+const swaggerSpec = (0, swagger_jsdoc_1.default)(swaggerOptions);
+app.use("/swagger", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swaggerSpec));
 app.use("/api/auth", auth_routes_1.default);
 app.use("/api/profile", profile_routes_1.default);
 app.use("/api/admin", admin_routes_1.default);

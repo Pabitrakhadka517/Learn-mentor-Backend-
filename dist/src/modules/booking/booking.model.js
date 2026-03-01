@@ -38,23 +38,30 @@ const mongoose_1 = __importStar(require("mongoose"));
 const bookingSchema = new mongoose_1.Schema({
     student: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
     tutor: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
+    availabilitySlot: { type: mongoose_1.Schema.Types.ObjectId, ref: 'AvailabilitySlot' },
     status: {
         type: String,
-        enum: ['PENDING', 'CONFIRMED', 'ACCEPTED', 'REJECTED', 'PAID', 'COMPLETED', 'CANCELLED'],
         default: 'PENDING'
+    },
+    sessionStatus: {
+        type: String,
+        enum: ['booked', 'confirmed', 'completed', 'cancelled'],
+        default: 'booked'
     },
     startTime: { type: Date, required: true },
     endTime: { type: Date, required: true },
     price: { type: Number, required: true },
     paymentStatus: {
         type: String,
-        enum: ['UNPAID', 'DONE'],
-        default: 'UNPAID'
-    }
+        enum: ['pending', 'paid', 'failed'],
+        default: 'pending'
+    },
+    notes: { type: String }
 }, { timestamps: true });
 bookingSchema.index({ student: 1, status: 1 });
 bookingSchema.index({ tutor: 1, status: 1 });
 bookingSchema.index({ tutor: 1, startTime: 1, endTime: 1 });
+bookingSchema.index({ availabilitySlot: 1 });
 bookingSchema.index({ status: 1 });
 bookingSchema.index({ createdAt: -1 });
 exports.Booking = mongoose_1.default.models?.Booking || (0, mongoose_1.model)('Booking', bookingSchema);

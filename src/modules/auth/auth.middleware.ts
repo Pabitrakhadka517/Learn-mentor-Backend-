@@ -13,6 +13,14 @@ export interface AuthRequest extends Request {
   };
 }
 
+const normalizeRole = (rawRole?: string): UserRole => {
+  const normalized = (rawRole || 'STUDENT').toString().trim().toUpperCase();
+  if (normalized === 'TUTOR') return 'TUTOR';
+  if (normalized === 'ADMIN') return 'ADMIN';
+  if (normalized === 'USER') return 'STUDENT';
+  return 'STUDENT';
+};
+
 /**
  * Authenticate middleware - validates JWT access token
  * Adds user info to request object
@@ -57,7 +65,7 @@ export const authenticate = async (
     // Attach user to request
     req.user = {
       userId: user._id.toString(),
-      role: user.role,
+      role: normalizeRole(user.role as unknown as string),
       email: user.email,
     };
 
@@ -96,7 +104,8 @@ export const authorizeRoles = (...roles: UserRole[]) => {
       });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const requesterRole = normalizeRole(req.user.role as unknown as string);
+    if (!roles.includes(requesterRole)) {
       return res.status(403).json({
         success: false,
         message: `Access denied. This endpoint requires one of the following roles: ${roles.join(', ')}`,
@@ -172,7 +181,7 @@ export const optionalAuthenticate = async (
     if (user && user.isActive) {
       req.user = {
         userId: user._id.toString(),
-        role: user.role,
+        role: normalizeRole(user.role as unknown as string),
         email: user.email,
       };
     }

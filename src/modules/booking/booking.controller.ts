@@ -4,9 +4,55 @@ import { AuthRequest } from '../auth/auth.middleware';
 import { Booking } from './booking.model';
 import { NotificationService } from '../notification/notification.service';
 import { User } from '../auth/user.model';
-import { TutorProfile } from '../tutor/tutor.model';
+import { AvailabilitySlot, TutorProfile } from '../tutor/tutor.model';
+import { io } from '../../socket';
 
 export class BookingController {
+
+    private static async resolveTutorUserId(identifier: string): Promise<string | null> {
+        const tutorUser = await User.findById(identifier);
+        if (tutorUser?.role === 'TUTOR') {
+            return String(tutorUser._id);
+        }
+
+        const profile = await TutorProfile.findById(identifier);
+        if (profile) {
+            return profile.user.toString();
+        }
+
+        return null;
+    }
+
+    private static emitAvailabilityUpdated(tutorId: string) {
+        if (!io) {
+            return;
+        }
+        io.to(`availability:${tutorId}`).emit('availability_updated', {
+            tutorId,
+            updatedAt: new Date().toISOString()
+        });
+    }
+
+    private static async releaseAvailabilitySlot(booking: any) {
+        if (!booking?.availabilitySlot) {
+            return;
+        }
+
+        await AvailabilitySlot.findOneAndUpdate(
+            {
+                _id: booking.availabilitySlot,
+                tutorId: booking.tutor,
+                startTime: booking.startTime,
+                endTime: booking.endTime,
+                isBooked: true
+            },
+            {
+                $set: { isBooked: false }
+            }
+        );
+
+        BookingController.emitAvailabilityUpdated(String(booking.tutor));
+    }
 
     /**
      * Create a new booking
@@ -31,19 +77,8 @@ export class BookingController {
             }
 
             // 1. Validation & ID Resolution
-            let tutorUser = await User.findById(tutorId);
-            let targetUserId = tutorId;
-
-            if (!tutorUser) {
-                // If not found by User ID, maybe it's a TutorProfile ID?
-                const profile = await TutorProfile.findById(tutorId);
-                if (profile) {
-                    targetUserId = profile.user.toString();
-                    tutorUser = await User.findById(targetUserId);
-                }
-            }
-
-            if (!tutorUser || tutorUser.role !== 'TUTOR') {
+            const targetUserId = await BookingController.resolveTutorUserId(tutorId);
+            if (!targetUserId) {
                 return res.status(404).json({ success: false, message: 'Tutor not found' });
             }
 
@@ -67,6 +102,28 @@ export class BookingController {
                 return res.status(400).json({ success: false, message: 'Cannot book sessions in the past' });
             }
 
+            const availabilitySlot = await AvailabilitySlot.findOneAndUpdate(
+                {
+                    tutorId: targetUserId,
+                    startTime: start,
+                    endTime: end,
+                    isBooked: false
+                },
+                {
+                    $set: { isBooked: true }
+                },
+                {
+                    new: true
+                }
+            );
+
+            if (!availabilitySlot) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'This slot is no longer available. Please refresh and choose another slot.'
+                });
+            }
+
             // 2. Prevent Double Booking
             // Check for overlaps: (StartA < EndB) AND (EndA > StartB)
             const conflict = await Booking.findOne({
@@ -81,6 +138,7 @@ export class BookingController {
             });
 
             if (conflict) {
+                await AvailabilitySlot.findByIdAndUpdate(availabilitySlot._id, { $set: { isBooked: false } });
                 return res.status(409).json({
                     success: false,
                     message: 'This time slot is already booked. Please choose another time.'
@@ -96,6 +154,7 @@ export class BookingController {
             const booking = new Booking({
                 student: studentId,
                 tutor: targetUserId,
+                availabilitySlot: availabilitySlot._id,
                 startTime: start,
                 endTime: end,
                 price: price,
@@ -106,6 +165,7 @@ export class BookingController {
             });
 
             await booking.save();
+            BookingController.emitAvailabilityUpdated(targetUserId);
 
             // 5. Notify Tutor
             try {
@@ -163,6 +223,7 @@ export class BookingController {
                 updateQuery.$set.sessionStatus = 'confirmed';
             } else if (status === 'REJECTED') {
                 updateQuery.$set.sessionStatus = 'cancelled';
+                await BookingController.releaseAvailabilitySlot(booking);
             }
 
             const updatedBooking = await Booking.findByIdAndUpdate(
@@ -315,6 +376,8 @@ export class BookingController {
                 { new: true, runValidators: false }
             );
 
+            await BookingController.releaseAvailabilitySlot(booking);
+
             // Notify other party
             const recipient = booking.student.toString() === userId ? booking.tutor : booking.student;
             try {
@@ -376,6 +439,23 @@ export class BookingController {
                 return res.status(409).json({ message: 'New time slot conflicts with an existing booking' });
             }
 
+            const newSlot = await AvailabilitySlot.findOneAndUpdate(
+                {
+                    tutorId: booking.tutor,
+                    startTime: start,
+                    endTime: end,
+                    isBooked: false
+                },
+                {
+                    $set: { isBooked: true }
+                },
+                { new: true }
+            );
+
+            if (!newSlot) {
+                return res.status(409).json({ message: 'Selected slot is no longer available. Please refresh.' });
+            }
+
             // Recalculate price if duration changed
             let price = booking.price; // Default to current price
             const tutorProfile = await TutorProfile.findOne({ user: booking.tutor });
@@ -390,12 +470,16 @@ export class BookingController {
                     $set: {
                         startTime: start,
                         endTime: end,
+                        availabilitySlot: newSlot._id,
                         price: price,
                         notes: notes !== undefined ? notes : booking.notes
                     }
                 },
                 { new: true, runValidators: false }
             );
+
+            await BookingController.releaseAvailabilitySlot(booking);
+            BookingController.emitAvailabilityUpdated(String(booking.tutor));
 
             // Notify tutor about update
             try {
@@ -411,7 +495,7 @@ export class BookingController {
                 console.error('Notification failed', notifError);
             }
 
-            res.json({ success: true, message: 'Booking updated successfully', booking });
+            res.json({ success: true, message: 'Booking updated successfully', booking: updatedBooking });
         } catch (error: any) {
             console.error('Update booking error:', error);
             res.status(500).json({ message: error.message });

@@ -2,8 +2,63 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TutorService = void 0;
 const tutor_model_1 = require("./tutor.model");
+const user_model_1 = require("../auth/user.model");
 const mongoose_1 = require("mongoose");
 class TutorService {
+    static async resolveTutorUserId(identifier) {
+        if (!mongoose_1.Types.ObjectId.isValid(identifier)) {
+            throw new Error('Tutor not found');
+        }
+        const userById = await user_model_1.User.findById(identifier).lean();
+        if (userById?.role === 'TUTOR') {
+            return String(userById._id);
+        }
+        const profile = await tutor_model_1.TutorProfile.findById(identifier).lean();
+        if (profile) {
+            return String(profile.user);
+        }
+        const tutorProfile = await tutor_model_1.TutorProfile.findOne({ user: identifier }).lean();
+        if (tutorProfile) {
+            return String(tutorProfile.user);
+        }
+        throw new Error('Tutor not found');
+    }
+    static normalizeAndValidateSlots(rawSlots) {
+        const now = Date.now();
+        const parsed = rawSlots.map((slot) => {
+            const startTime = new Date(slot.startTime);
+            const endTime = new Date(slot.endTime);
+            if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                throw new Error('Invalid slot date/time format');
+            }
+            if (startTime >= endTime) {
+                throw new Error('Each slot must have endTime after startTime');
+            }
+            if (startTime.getTime() <= now) {
+                return null;
+            }
+            return { startTime, endTime };
+        }).filter((slot) => slot !== null);
+        parsed.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+        for (let index = 1; index < parsed.length; index++) {
+            const previous = parsed[index - 1];
+            const current = parsed[index];
+            if (current.startTime < previous.endTime) {
+                throw new Error('Availability slots cannot overlap');
+            }
+        }
+        const deduped = [];
+        const seen = new Set();
+        for (const slot of parsed) {
+            const key = `${slot.startTime.toISOString()}|${slot.endTime.toISOString()}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            deduped.push(slot);
+        }
+        return deduped;
+    }
     static async getTutors(query) {
         const { subject, minPrice, maxPrice, language, availability, search, sortBy, page, limit, verifiedOnly } = query;
         const pipeline = [];
@@ -137,17 +192,10 @@ class TutorService {
         };
     }
     static async getTutorById(tutorId) {
-        if (!mongoose_1.Types.ObjectId.isValid(tutorId)) {
-            throw new Error('Tutor not found');
-        }
-        let tutor = await tutor_model_1.TutorProfile.findById(tutorId)
+        const resolvedTutorUserId = await this.resolveTutorUserId(tutorId);
+        const tutor = await tutor_model_1.TutorProfile.findOne({ user: resolvedTutorUserId })
             .populate('user', 'fullName email profileImage phone location')
             .lean();
-        if (!tutor) {
-            tutor = await tutor_model_1.TutorProfile.findOne({ user: tutorId })
-                .populate('user', 'fullName email profileImage phone location')
-                .lean();
-        }
         if (!tutor) {
             throw new Error('Tutor not found');
         }
@@ -184,19 +232,36 @@ class TutorService {
         }
         return await tutor_model_1.AvailabilitySlot.find(query).sort({ startTime: 1 }).lean();
     }
+    static async getPublicAvailabilitySlots(tutorIdentifier, startDate, endDate) {
+        const tutorUserId = await this.resolveTutorUserId(tutorIdentifier);
+        const now = new Date();
+        const query = {
+            tutorId: new mongoose_1.Types.ObjectId(tutorUserId),
+            isBooked: false,
+            startTime: { $gte: startDate && startDate > now ? startDate : now }
+        };
+        if (endDate) {
+            query.startTime.$lte = endDate;
+        }
+        return await tutor_model_1.AvailabilitySlot.find(query)
+            .sort({ startTime: 1 })
+            .limit(120)
+            .lean();
+    }
     static async setAvailabilitySlots(tutorId, slots) {
         const tid = new mongoose_1.Types.ObjectId(tutorId);
         const now = new Date();
+        const normalizedSlots = this.normalizeAndValidateSlots(slots);
         await tutor_model_1.AvailabilitySlot.deleteMany({
             tutorId: tid,
             startTime: { $gt: now },
             isBooked: false
         });
-        if (slots.length > 0) {
-            const slotsToInsert = slots.map(slot => ({
+        if (normalizedSlots.length > 0) {
+            const slotsToInsert = normalizedSlots.map(slot => ({
                 tutorId: tid,
-                startTime: new Date(slot.startTime),
-                endTime: new Date(slot.endTime),
+                startTime: slot.startTime,
+                endTime: slot.endTime,
                 isBooked: false
             }));
             await tutor_model_1.AvailabilitySlot.insertMany(slotsToInsert);

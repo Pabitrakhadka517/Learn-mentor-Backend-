@@ -7,6 +7,7 @@ export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'PAID' | 'COM
 export interface IBooking extends Document {
     student: Types.ObjectId;
     tutor: Types.ObjectId;
+    availabilitySlot?: Types.ObjectId;
     status: string; // Keeping for compatibility or we can migrate
     sessionStatus: SessionStatus;
     paymentStatus: PaymentStatus;
@@ -21,6 +22,7 @@ export interface IBooking extends Document {
 const bookingSchema = new Schema<IBooking>({
     student: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     tutor: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    availabilitySlot: { type: Schema.Types.ObjectId, ref: 'AvailabilitySlot' },
     status: {
         type: String,
         default: 'PENDING'
@@ -45,6 +47,7 @@ const bookingSchema = new Schema<IBooking>({
 bookingSchema.index({ student: 1, status: 1 }); // For student dashboard queries
 bookingSchema.index({ tutor: 1, status: 1 }); // For tutor dashboard queries
 bookingSchema.index({ tutor: 1, startTime: 1, endTime: 1 }); // For double-booking prevention
+bookingSchema.index({ availabilitySlot: 1 });
 bookingSchema.index({ status: 1 }); // For admin dashboard
 bookingSchema.index({ createdAt: -1 }); // For recent bookings sorting
 

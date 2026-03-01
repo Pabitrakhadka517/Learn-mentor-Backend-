@@ -5,7 +5,43 @@ const booking_model_1 = require("./booking.model");
 const notification_service_1 = require("../notification/notification.service");
 const user_model_1 = require("../auth/user.model");
 const tutor_model_1 = require("../tutor/tutor.model");
+const socket_1 = require("../../socket");
 class BookingController {
+    static async resolveTutorUserId(identifier) {
+        const tutorUser = await user_model_1.User.findById(identifier);
+        if (tutorUser?.role === 'TUTOR') {
+            return String(tutorUser._id);
+        }
+        const profile = await tutor_model_1.TutorProfile.findById(identifier);
+        if (profile) {
+            return profile.user.toString();
+        }
+        return null;
+    }
+    static emitAvailabilityUpdated(tutorId) {
+        if (!socket_1.io) {
+            return;
+        }
+        socket_1.io.to(`availability:${tutorId}`).emit('availability_updated', {
+            tutorId,
+            updatedAt: new Date().toISOString()
+        });
+    }
+    static async releaseAvailabilitySlot(booking) {
+        if (!booking?.availabilitySlot) {
+            return;
+        }
+        await tutor_model_1.AvailabilitySlot.findOneAndUpdate({
+            _id: booking.availabilitySlot,
+            tutorId: booking.tutor,
+            startTime: booking.startTime,
+            endTime: booking.endTime,
+            isBooked: true
+        }, {
+            $set: { isBooked: false }
+        });
+        BookingController.emitAvailabilityUpdated(String(booking.tutor));
+    }
     static async createBooking(req, res) {
         try {
             const studentId = req.user?.userId;
@@ -16,16 +52,8 @@ class BookingController {
             if (!tutorId || !startTime || !endTime) {
                 return res.status(400).json({ success: false, message: 'Missing required booking details' });
             }
-            let tutorUser = await user_model_1.User.findById(tutorId);
-            let targetUserId = tutorId;
-            if (!tutorUser) {
-                const profile = await tutor_model_1.TutorProfile.findById(tutorId);
-                if (profile) {
-                    targetUserId = profile.user.toString();
-                    tutorUser = await user_model_1.User.findById(targetUserId);
-                }
-            }
-            if (!tutorUser || tutorUser.role !== 'TUTOR') {
+            const targetUserId = await BookingController.resolveTutorUserId(tutorId);
+            if (!targetUserId) {
                 return res.status(404).json({ success: false, message: 'Tutor not found' });
             }
             const tutorProfile = await tutor_model_1.TutorProfile.findOne({ user: targetUserId });
@@ -43,6 +71,22 @@ class BookingController {
             if (start < new Date()) {
                 return res.status(400).json({ success: false, message: 'Cannot book sessions in the past' });
             }
+            const availabilitySlot = await tutor_model_1.AvailabilitySlot.findOneAndUpdate({
+                tutorId: targetUserId,
+                startTime: start,
+                endTime: end,
+                isBooked: false
+            }, {
+                $set: { isBooked: true }
+            }, {
+                new: true
+            });
+            if (!availabilitySlot) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'This slot is no longer available. Please refresh and choose another slot.'
+                });
+            }
             const conflict = await booking_model_1.Booking.findOne({
                 tutor: targetUserId,
                 status: { $in: ['PENDING', 'CONFIRMED', 'ACCEPTED', 'PAID'] },
@@ -54,6 +98,7 @@ class BookingController {
                 ]
             });
             if (conflict) {
+                await tutor_model_1.AvailabilitySlot.findByIdAndUpdate(availabilitySlot._id, { $set: { isBooked: false } });
                 return res.status(409).json({
                     success: false,
                     message: 'This time slot is already booked. Please choose another time.'
@@ -64,14 +109,17 @@ class BookingController {
             const booking = new booking_model_1.Booking({
                 student: studentId,
                 tutor: targetUserId,
+                availabilitySlot: availabilitySlot._id,
                 startTime: start,
                 endTime: end,
                 price: price,
                 notes: notes,
                 status: 'PENDING',
-                paymentStatus: 'UNPAID'
+                sessionStatus: 'booked',
+                paymentStatus: 'pending'
             });
             await booking.save();
+            BookingController.emitAvailabilityUpdated(targetUserId);
             try {
                 const student = await user_model_1.User.findById(studentId);
                 await notification_service_1.NotificationService.createNotification({
@@ -111,7 +159,15 @@ class BookingController {
             if (booking.tutor.toString() !== userId) {
                 return res.status(403).json({ message: 'Unauthorized action on booking' });
             }
-            const updatedBooking = await booking_model_1.Booking.findByIdAndUpdate(bookingId, { $set: { status } }, { new: true, runValidators: false });
+            const updateQuery = { $set: { status } };
+            if (status === 'CONFIRMED' || status === 'ACCEPTED') {
+                updateQuery.$set.sessionStatus = 'confirmed';
+            }
+            else if (status === 'REJECTED') {
+                updateQuery.$set.sessionStatus = 'cancelled';
+                await BookingController.releaseAvailabilitySlot(booking);
+            }
+            const updatedBooking = await booking_model_1.Booking.findByIdAndUpdate(bookingId, updateQuery, { new: true, runValidators: false });
             if (!updatedBooking) {
                 return res.status(500).json({ message: 'Failed to update booking status' });
             }
@@ -171,10 +227,19 @@ class BookingController {
             if (booking.tutor.toString() !== userId && booking.student.toString() !== userId) {
                 return res.status(403).json({ message: 'Unauthorized: Only parties involved in the booking can complete it' });
             }
-            if (booking.status !== 'PAID' && booking.status !== 'CONFIRMED') {
-                return res.status(400).json({ message: 'Booking must be PAID or CONFIRMED to complete' });
+            if (booking.paymentStatus !== 'paid' && booking.status !== 'PAID') {
+                return res.status(400).json({
+                    message: 'Payment has not been completed for this session. Please pay first.',
+                    requiresPayment: true
+                });
             }
-            const updatedBooking = await booking_model_1.Booking.findByIdAndUpdate(id, { $set: { status: 'COMPLETED' } }, { new: true, runValidators: false });
+            const updatedBooking = await booking_model_1.Booking.findByIdAndUpdate(id, {
+                $set: {
+                    status: 'COMPLETED',
+                    sessionStatus: 'completed',
+                    paymentStatus: 'paid'
+                }
+            }, { new: true, runValidators: false });
             const recipient = booking.student.toString() === userId ? booking.tutor : booking.student;
             const completerRole = userId === booking.student.toString() ? 'Student' : 'Tutor';
             try {
@@ -208,7 +273,13 @@ class BookingController {
             if (booking.status === 'COMPLETED') {
                 return res.status(400).json({ message: 'Cannot cancel a completed booking' });
             }
-            const updatedBooking = await booking_model_1.Booking.findByIdAndUpdate(id, { $set: { status: 'CANCELLED' } }, { new: true, runValidators: false });
+            const updatedBooking = await booking_model_1.Booking.findByIdAndUpdate(id, {
+                $set: {
+                    status: 'CANCELLED',
+                    sessionStatus: 'cancelled'
+                }
+            }, { new: true, runValidators: false });
+            await BookingController.releaseAvailabilitySlot(booking);
             const recipient = booking.student.toString() === userId ? booking.tutor : booking.student;
             try {
                 await notification_service_1.NotificationService.createNotification({
@@ -257,6 +328,17 @@ class BookingController {
             if (conflict) {
                 return res.status(409).json({ message: 'New time slot conflicts with an existing booking' });
             }
+            const newSlot = await tutor_model_1.AvailabilitySlot.findOneAndUpdate({
+                tutorId: booking.tutor,
+                startTime: start,
+                endTime: end,
+                isBooked: false
+            }, {
+                $set: { isBooked: true }
+            }, { new: true });
+            if (!newSlot) {
+                return res.status(409).json({ message: 'Selected slot is no longer available. Please refresh.' });
+            }
             let price = booking.price;
             const tutorProfile = await tutor_model_1.TutorProfile.findOne({ user: booking.tutor });
             if (tutorProfile) {
@@ -267,10 +349,13 @@ class BookingController {
                 $set: {
                     startTime: start,
                     endTime: end,
+                    availabilitySlot: newSlot._id,
                     price: price,
                     notes: notes !== undefined ? notes : booking.notes
                 }
             }, { new: true, runValidators: false });
+            await BookingController.releaseAvailabilitySlot(booking);
+            BookingController.emitAvailabilityUpdated(String(booking.tutor));
             try {
                 const student = await user_model_1.User.findById(userId);
                 await notification_service_1.NotificationService.createNotification({
@@ -284,7 +369,7 @@ class BookingController {
             catch (notifError) {
                 console.error('Notification failed', notifError);
             }
-            res.json({ success: true, message: 'Booking updated successfully', booking });
+            res.json({ success: true, message: 'Booking updated successfully', booking: updatedBooking });
         }
         catch (error) {
             console.error('Update booking error:', error);

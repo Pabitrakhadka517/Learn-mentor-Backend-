@@ -8,6 +8,7 @@ const socket_io_1 = require("socket.io");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const chat_model_1 = require("./modules/chat/chat.model");
 const chat_service_1 = require("./modules/chat/chat.service");
+const jwt_1 = require("./config/jwt");
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 const initSocket = (httpServer) => {
@@ -24,7 +25,7 @@ const initSocket = (httpServer) => {
             if (!token) {
                 return next(new Error('Authentication error: Token required'));
             }
-            const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_ACCESS_SECRET || 'fallback_secret');
+            const decoded = jsonwebtoken_1.default.verify(token, jwt_1.jwtConfig.accessSecret);
             socket.data.user = decoded;
             next();
         }
@@ -65,13 +66,27 @@ const initSocket = (httpServer) => {
                 socket.emit('error', { message: 'Failed to join room' });
             }
         });
+        socket.on('join_tutor_availability', (data) => {
+            try {
+                const tutorId = data?.tutorId;
+                if (!tutorId) {
+                    return;
+                }
+                const room = `availability:${tutorId}`;
+                socket.join(room);
+                socket.emit('joined_tutor_availability', { tutorId });
+            }
+            catch (error) {
+                console.error('Join tutor availability room error:', error);
+            }
+        });
         socket.on('send_message', async (data) => {
             try {
                 const { chatId, content, attachments } = data;
                 if (!chatId || !content)
                     return;
                 try {
-                    const message = await chat_service_1.ChatService.sendMessage(chatId, userId, content, attachments);
+                    const message = await chat_service_1.ChatService.sendMessage(chatId, userId, { content, attachments });
                     socket.emit('message_sent', { success: true, messageId: message._id });
                 }
                 catch (serviceError) {

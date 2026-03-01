@@ -10,6 +10,27 @@ import { Transaction } from './transaction.model';
 import { User } from '../auth/user.model';
 import { NotificationService } from '../notification/notification.service';
 
+const ESEWA_SIGNED_FIELD_NAMES = 'total_amount,transaction_uuid,product_code';
+
+function formatEsewaAmount(amount: number): string {
+    const normalized = Number(amount).toFixed(2);
+    return normalized.replace(/\.00$/, '').replace(/(\.\d*?)0+$/, '$1');
+}
+
+function createEsewaSignature(params: {
+    totalAmount: string;
+    transactionUuid: string;
+    productCode: string;
+    secret: string;
+}): string {
+    const hashString = `total_amount=${params.totalAmount},transaction_uuid=${params.transactionUuid},product_code=${params.productCode}`;
+
+    return crypto
+        .createHmac('sha256', params.secret)
+        .update(hashString)
+        .digest('base64');
+}
+
 export const initBookingTransaction = async (req: AuthRequest, res: Response) => {
     try {
         const { bookingId } = req.params;
@@ -47,6 +68,7 @@ export const initBookingTransaction = async (req: AuthRequest, res: Response) =>
         });
 
         const transactionUuid = uuidv4();
+        const productCode = (process.env.ESEWA_PRODUCT_CODE || 'EPAYTEST').trim();
 
         if (!transaction) {
             // Create new transaction
@@ -55,25 +77,38 @@ export const initBookingTransaction = async (req: AuthRequest, res: Response) =>
                 sender: booking.student,
                 receiver: booking.tutor,
                 amount: booking.price,
-                productCode: 'EPAYTEST',
+                productCode,
                 transactionUuid,
                 status: 'pending'
             });
         } else {
             // Update the UUID for the fresh attempt
             transaction.transactionUuid = transactionUuid;
+            transaction.productCode = productCode;
         }
 
         await transaction.save();
 
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const totalAmount = formatEsewaAmount(transaction.amount);
+        const signed_field_names = ESEWA_SIGNED_FIELD_NAMES;
+        const secret = process.env.ESEWA_SECRET || '8gBm/:&EnhH.1/q';
+        const signature = createEsewaSignature({
+            totalAmount,
+            transactionUuid: transaction.transactionUuid,
+            productCode: transaction.productCode,
+            secret,
+        });
 
         // Return details for eSewa
         res.json({
             transactionId: transaction._id,
             amount: transaction.amount,
+            total_amount: totalAmount,
             product_code: transaction.productCode,
             transaction_uuid: transaction.transactionUuid,
+            signed_field_names,
+            signature,
             success_url: `${frontendUrl}/dashboard/payment/success`,
             failure_url: `${frontendUrl}/dashboard/payment/failure`
         });
@@ -125,6 +160,8 @@ export const initTransaction = async (req: AuthRequest, res: Response) => {
             status: 'pending'
         });
 
+        const productCode = (process.env.ESEWA_PRODUCT_CODE || 'EPAYTEST').trim();
+
         if (!transaction) {
             // Create new transaction
             const transactionUuid = uuidv4();
@@ -134,23 +171,39 @@ export const initTransaction = async (req: AuthRequest, res: Response) => {
                 sender: job.sender,
                 receiver: job.receiver,
                 amount: job.amount,
-                productCode: 'EPAYTEST', // Default for testing
+                productCode,
                 transactionUuid,
                 status: 'pending'
             });
 
             await transaction.save();
+        } else {
+            transaction.productCode = productCode;
+            await transaction.save();
         }
+
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const totalAmount = formatEsewaAmount(transaction.amount);
+        const signed_field_names = ESEWA_SIGNED_FIELD_NAMES;
+        const secret = process.env.ESEWA_SECRET || '8gBm/:&EnhH.1/q';
+        const signature = createEsewaSignature({
+            totalAmount,
+            transactionUuid: transaction.transactionUuid,
+            productCode: transaction.productCode,
+            secret,
+        });
 
         // Return details for eSewa
         res.json({
             transactionId: transaction._id,
             amount: transaction.amount,
+            total_amount: totalAmount,
             product_code: transaction.productCode,
             transaction_uuid: transaction.transactionUuid,
-            signature: '',
-            success_url: `${process.env.FRONTEND_URL}/dashboard/payment/success`,
-            failure_url: `${process.env.FRONTEND_URL}/dashboard/payment/failure`
+            signed_field_names,
+            signature,
+            success_url: `${frontendUrl}/dashboard/payment/success`,
+            failure_url: `${frontendUrl}/dashboard/payment/failure`
         });
 
     } catch (error: any) {
@@ -388,14 +441,24 @@ export const payTransaction = async (req: AuthRequest, res: Response) => {
             }
         }
 
-        // 4. Notify Tutor
+        // 4. Notify both participants
         try {
             const studentName = (transaction.sender as any).fullName || 'a student';
+            const tutorName = (transaction.receiver as any).fullName || 'your tutor';
+
             await NotificationService.createNotification({
                 recipient: transaction.receiver._id,
                 sender: transaction.sender._id,
                 type: 'PAYMENT_SUCCESS',
                 message: `Payment of Rs. ${receiverAmount} received from ${studentName} for session booking`,
+                relatedId: transaction._id
+            });
+
+            await NotificationService.createNotification({
+                recipient: transaction.sender._id,
+                sender: transaction.receiver._id,
+                type: 'PAYMENT_SUCCESS',
+                message: `Your payment of Rs. ${amountFromDB} to ${tutorName} was completed successfully`,
                 relatedId: transaction._id
             });
         } catch (notifError) {

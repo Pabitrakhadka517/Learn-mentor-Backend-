@@ -11,6 +11,16 @@ const email_service_1 = require("../notification/email.service");
 const jwt_1 = require("../../config/jwt");
 const auth_dto_1 = require("./auth.dto");
 class AuthService {
+    static normalizeRole(rawRole) {
+        const normalized = (rawRole || 'STUDENT').toString().trim().toUpperCase();
+        if (normalized === 'TUTOR')
+            return 'TUTOR';
+        if (normalized === 'ADMIN')
+            return 'ADMIN';
+        if (normalized === 'USER')
+            return 'STUDENT';
+        return 'STUDENT';
+    }
     static async register(dto) {
         const validated = auth_dto_1.RegisterDTOSchema.parse(dto);
         if (validated.role === 'ADMIN') {
@@ -52,7 +62,16 @@ class AuthService {
         if (!isPasswordValid) {
             throw new Error('Invalid credentials');
         }
-        const { accessToken, refreshToken } = await this.generateTokens(user._id.toString(), user.role, user.email);
+        const canonicalUserRole = this.normalizeRole(user.role);
+        const canonicalExpectedRole = validated.expectedRole
+            ? this.normalizeRole(validated.expectedRole)
+            : undefined;
+        if (canonicalExpectedRole && canonicalUserRole !== canonicalExpectedRole) {
+            const roleLabel = validated.expectedRole === 'STUDENT' ? 'Student' : validated.expectedRole === 'TUTOR' ? 'Tutor' : 'Admin';
+            const actualLabel = canonicalUserRole === 'STUDENT' ? 'Student' : canonicalUserRole === 'TUTOR' ? 'Tutor' : 'Admin';
+            throw Object.assign(new Error(`This account is registered as a ${actualLabel}. Please use the ${actualLabel} login page instead.`), { statusCode: 403 });
+        }
+        const { accessToken, refreshToken } = await this.generateTokens(user._id.toString(), canonicalUserRole, user.email);
         const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         const refreshTokenHash = await auth_repository_1.AuthRepository.hashPassword(refreshToken);
         await auth_repository_1.AuthRepository.storeRefreshToken(user._id.toString(), refreshTokenHash, refreshTokenExpiry);
@@ -77,9 +96,10 @@ class AuthService {
             if (!storedToken) {
                 throw new Error('Invalid refresh token');
             }
+            const canonicalRole = this.normalizeRole(user.role);
             const accessToken = jsonwebtoken_1.default.sign({
                 userId: user._id.toString(),
-                role: user.role,
+                role: canonicalRole,
                 email: user.email,
             }, jwt_1.jwtConfig.accessSecret, { expiresIn: jwt_1.jwtConfig.accessExpiry });
             return { accessToken };
@@ -166,7 +186,7 @@ class AuthService {
         return {
             id: user._id?.toString() || user._id,
             email: user.email,
-            role: user.role,
+            role: this.normalizeRole(user.role),
             fullName: user.fullName,
             phone: user.phone,
             profileImage: user.profileImage,

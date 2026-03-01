@@ -3,7 +3,80 @@ import { TutorQueryDTO, TutorResponseDTO } from './tutor.dto';
 import { User } from '../auth/user.model';
 import { Types } from 'mongoose';
 
+type SlotInput = { startTime: Date | string, endTime: Date | string };
+
 export class TutorService {
+    private static async resolveTutorUserId(identifier: string): Promise<string> {
+        if (!Types.ObjectId.isValid(identifier)) {
+            throw new Error('Tutor not found');
+        }
+
+        const userById = await User.findById(identifier).lean();
+        if (userById?.role === 'TUTOR') {
+            return String(userById._id);
+        }
+
+        const profile = await TutorProfile.findById(identifier).lean();
+        if (profile) {
+            return String(profile.user);
+        }
+
+        const tutorProfile = await TutorProfile.findOne({ user: identifier }).lean();
+        if (tutorProfile) {
+            return String(tutorProfile.user);
+        }
+
+        throw new Error('Tutor not found');
+    }
+
+    private static normalizeAndValidateSlots(rawSlots: SlotInput[]): { startTime: Date, endTime: Date }[] {
+        const now = Date.now();
+
+        const parsed = rawSlots.map((slot) => {
+            const startTime = new Date(slot.startTime);
+            const endTime = new Date(slot.endTime);
+
+            if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+                throw new Error('Invalid slot date/time format');
+            }
+
+            if (startTime >= endTime) {
+                throw new Error('Each slot must have endTime after startTime');
+            }
+
+            if (startTime.getTime() <= now) {
+                return null;
+            }
+
+            return { startTime, endTime };
+        }).filter((slot): slot is { startTime: Date, endTime: Date } => slot !== null);
+
+        parsed.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+        for (let index = 1; index < parsed.length; index++) {
+            const previous = parsed[index - 1];
+            const current = parsed[index];
+
+            if (current.startTime < previous.endTime) {
+                throw new Error('Availability slots cannot overlap');
+            }
+        }
+
+        const deduped: { startTime: Date, endTime: Date }[] = [];
+        const seen = new Set<string>();
+
+        for (const slot of parsed) {
+            const key = `${slot.startTime.toISOString()}|${slot.endTime.toISOString()}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            deduped.push(slot);
+        }
+
+        return deduped;
+    }
+
     /**
      * Get list of verified tutors with filtering, searching, and sorting
      */
@@ -193,22 +266,12 @@ export class TutorService {
      * Get single tutor by ID with full details
      */
     static async getTutorById(tutorId: string): Promise<any> {
-        // Validate ID format
-        if (!Types.ObjectId.isValid(tutorId)) {
-            throw new Error('Tutor not found');
-        }
+        const resolvedTutorUserId = await this.resolveTutorUserId(tutorId);
 
         // Support finding by Profile ID OR User ID
-        let tutor = await TutorProfile.findById(tutorId)
+        const tutor = await TutorProfile.findOne({ user: resolvedTutorUserId })
             .populate('user', 'fullName email profileImage phone location')
             .lean();
-
-        if (!tutor) {
-            // Try searching by User ID
-            tutor = await TutorProfile.findOne({ user: tutorId })
-                .populate('user', 'fullName email profileImage phone location')
-                .lean();
-        }
 
         if (!tutor) {
             throw new Error('Tutor not found');
@@ -221,7 +284,7 @@ export class TutorService {
         // Fetch available slots for this tutor
         const now = new Date();
         const slots = await AvailabilitySlot.find({
-            tutorId: tutor.user._id, // Assuming tutor.user is populated object
+            tutorId: tutor.user._id,
             startTime: { $gt: now },
             isBooked: false
         })
@@ -256,12 +319,36 @@ export class TutorService {
     }
 
     /**
+     * Public availability list for students (future + unbooked only)
+     */
+    static async getPublicAvailabilitySlots(tutorIdentifier: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+        const tutorUserId = await this.resolveTutorUserId(tutorIdentifier);
+        const now = new Date();
+
+        const query: any = {
+            tutorId: new Types.ObjectId(tutorUserId),
+            isBooked: false,
+            startTime: { $gte: startDate && startDate > now ? startDate : now }
+        };
+
+        if (endDate) {
+            query.startTime.$lte = endDate;
+        }
+
+        return await AvailabilitySlot.find(query)
+            .sort({ startTime: 1 })
+            .limit(120)
+            .lean();
+    }
+
+    /**
      * setAvailabilitySlots (Sync slots)
      * Replaces future unbooked slots with new ones
      */
-    static async setAvailabilitySlots(tutorId: string, slots: { startTime: Date, endTime: Date }[]): Promise<void> {
+    static async setAvailabilitySlots(tutorId: string, slots: SlotInput[]): Promise<void> {
         const tid = new Types.ObjectId(tutorId);
         const now = new Date();
+        const normalizedSlots = this.normalizeAndValidateSlots(slots);
 
         // 1. Delete all future unbooked slots for this tutor
         await AvailabilitySlot.deleteMany({
@@ -271,11 +358,11 @@ export class TutorService {
         });
 
         // 2. Insert new slots
-        if (slots.length > 0) {
-            const slotsToInsert = slots.map(slot => ({
+        if (normalizedSlots.length > 0) {
+            const slotsToInsert = normalizedSlots.map(slot => ({
                 tutorId: tid,
-                startTime: new Date(slot.startTime),
-                endTime: new Date(slot.endTime),
+                startTime: slot.startTime,
+                endTime: slot.endTime,
                 isBooked: false
             }));
             await AvailabilitySlot.insertMany(slotsToInsert);

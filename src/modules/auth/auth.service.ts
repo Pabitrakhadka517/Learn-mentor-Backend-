@@ -21,6 +21,14 @@ import {
 import { UserRole } from './user.model';
 
 export class AuthService {
+  private static normalizeRole(rawRole?: string): UserRole {
+    const normalized = (rawRole || 'STUDENT').toString().trim().toUpperCase();
+    if (normalized === 'TUTOR') return 'TUTOR';
+    if (normalized === 'ADMIN') return 'ADMIN';
+    if (normalized === 'USER') return 'STUDENT';
+    return 'STUDENT';
+  }
+
   /**
    * Register a new STUDENT or TUTOR (public registration)
    * ADMIN cannot register via this endpoint
@@ -105,9 +113,14 @@ export class AuthService {
     }
 
     // Validate role if expectedRole is provided (role-based login enforcement)
-    if (validated.expectedRole && user.role !== validated.expectedRole) {
+    const canonicalUserRole = this.normalizeRole(user.role as unknown as string);
+    const canonicalExpectedRole = validated.expectedRole
+      ? this.normalizeRole(validated.expectedRole as unknown as string)
+      : undefined;
+
+    if (canonicalExpectedRole && canonicalUserRole !== canonicalExpectedRole) {
       const roleLabel = validated.expectedRole === 'STUDENT' ? 'Student' : validated.expectedRole === 'TUTOR' ? 'Tutor' : 'Admin';
-      const actualLabel = user.role === 'STUDENT' ? 'Student' : user.role === 'TUTOR' ? 'Tutor' : 'Admin';
+      const actualLabel = canonicalUserRole === 'STUDENT' ? 'Student' : canonicalUserRole === 'TUTOR' ? 'Tutor' : 'Admin';
       throw Object.assign(
         new Error(`This account is registered as a ${actualLabel}. Please use the ${actualLabel} login page instead.`),
         { statusCode: 403 }
@@ -115,7 +128,7 @@ export class AuthService {
     }
 
     // Generate tokens
-    const { accessToken, refreshToken } = await this.generateTokens(user._id.toString(), user.role, user.email);
+    const { accessToken, refreshToken } = await this.generateTokens(user._id.toString(), canonicalUserRole, user.email);
 
     // Store refresh token
     const refreshTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -157,10 +170,11 @@ export class AuthService {
       }
 
       // Generate new access token
+      const canonicalRole = this.normalizeRole(user.role as unknown as string);
       const accessToken = jwt.sign(
         {
           userId: user._id.toString(),
-          role: user.role,
+          role: canonicalRole,
           email: user.email,
         },
         jwtConfig.accessSecret as string,
@@ -309,7 +323,7 @@ export class AuthService {
     return {
       id: user._id?.toString() || user._id,
       email: user.email,
-      role: user.role,
+      role: this.normalizeRole(user.role as unknown as string),
       fullName: user.fullName,
       phone: user.phone,
       profileImage: user.profileImage,

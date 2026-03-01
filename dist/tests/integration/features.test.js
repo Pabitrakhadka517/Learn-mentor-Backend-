@@ -6,15 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const supertest_1 = __importDefault(require("supertest"));
 const app_1 = __importDefault(require("../../src/app"));
 const user_model_1 = require("../../src/modules/auth/user.model");
+const auth_repository_1 = require("../../src/modules/auth/auth.repository");
 const announcement_model_1 = require("../../src/modules/admin/announcement.model");
 const mongoose_1 = __importDefault(require("mongoose"));
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
 describe('Special Features & Announcements Integration Tests', () => {
     let adminToken;
     let studentToken;
     let adminId;
     beforeEach(async () => {
-        const password = await bcryptjs_1.default.hash('Password123!', 10);
+        const password = await auth_repository_1.AuthRepository.hashPassword('Password123!');
         const admin = await user_model_1.User.create({
             email: 'admin_test@example.com',
             passwordHash: password,
@@ -26,7 +26,13 @@ describe('Special Features & Announcements Integration Tests', () => {
         const adminLogin = await (0, supertest_1.default)(app_1.default)
             .post('/api/auth/login')
             .send({ email: 'admin_test@example.com', password: 'Password123!' });
-        adminToken = adminLogin.body.accessToken;
+        adminToken = adminLogin.body?.accessToken;
+        if (!adminToken) {
+            console.error('FAILED TO LOGIN ADMIN');
+            console.error('Admin login status:', adminLogin.status);
+            console.error('Admin login body:', JSON.stringify(adminLogin.body, null, 2));
+            throw new Error(`Admin login failed: ${adminLogin.body?.message || 'Unknown error'}`);
+        }
         await user_model_1.User.create({
             email: 'student_test@example.com',
             passwordHash: password,
@@ -37,11 +43,12 @@ describe('Special Features & Announcements Integration Tests', () => {
         const studentLogin = await (0, supertest_1.default)(app_1.default)
             .post('/api/auth/login')
             .send({ email: 'student_test@example.com', password: 'Password123!' });
-        studentToken = studentLogin.body.accessToken;
-        if (!adminToken || !studentToken) {
-            console.error('FAILED TO OBTAIN TOKENS IN BEFOREEACH');
-            console.error('Admin response:', adminLogin.body);
-            console.error('Student response:', studentLogin.body);
+        studentToken = studentLogin.body?.accessToken;
+        if (!studentToken) {
+            console.error('FAILED TO LOGIN STUDENT');
+            console.error('Student login status:', studentLogin.status);
+            console.error('Student login body:', JSON.stringify(studentLogin.body, null, 2));
+            throw new Error(`Student login failed: ${studentLogin.body?.message || 'Unknown error'}`);
         }
     });
     afterAll(async () => {

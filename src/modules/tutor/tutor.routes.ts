@@ -166,6 +166,39 @@ router.post('/my/verify/submit', authenticate, authorizeRoles('TUTOR'), TutorCon
 
 /**
  * @swagger
+ * /api/tutors/{id}/availability:
+ *   get:
+ *     summary: Get tutor's public availability slots
+ *     tags: [Tutors]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tutor profile ID or User ID
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *     responses:
+ *       200:
+ *         description: Tutor availability retrieved successfully
+ *       404:
+ *         description: Tutor not found
+ */
+router.get('/:id/availability', authenticate, authorizeRoles('STUDENT', 'ADMIN', 'TUTOR'), TutorController.getTutorAvailability);
+
+/**
+ * @swagger
  * /api/tutors/{id}:
  *   get:
  *     summary: Get detailed tutor profile by ID

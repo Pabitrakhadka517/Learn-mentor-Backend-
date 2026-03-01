@@ -6,13 +6,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const supertest_1 = __importDefault(require("supertest"));
 const app_1 = __importDefault(require("../../src/app"));
 const user_model_1 = require("../../src/modules/auth/user.model");
+const auth_repository_1 = require("../../src/modules/auth/auth.repository");
 const mongoose_1 = __importDefault(require("mongoose"));
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
 describe('Admin Integration Tests', () => {
     let adminToken;
     let adminId;
     beforeEach(async () => {
-        const passwordHash = await bcryptjs_1.default.hash('AdminPass123!', 10);
+        const passwordHash = await auth_repository_1.AuthRepository.hashPassword('AdminPass123!');
         const admin = await user_model_1.User.create({
             email: 'admin@example.com',
             passwordHash,
@@ -24,7 +24,13 @@ describe('Admin Integration Tests', () => {
         const loginRes = await (0, supertest_1.default)(app_1.default)
             .post('/api/auth/login')
             .send({ email: 'admin@example.com', password: 'AdminPass123!' });
-        adminToken = loginRes.body.accessToken;
+        adminToken = loginRes.body?.accessToken;
+        if (!adminToken) {
+            console.error('FAILED TO LOGIN ADMIN');
+            console.error('Login status:', loginRes.status);
+            console.error('Login body:', JSON.stringify(loginRes.body, null, 2));
+            throw new Error(`Admin login failed: ${loginRes.body?.message || 'Unknown error'}`);
+        }
     });
     describe('GET /api/admin/users', () => {
         beforeEach(async () => {

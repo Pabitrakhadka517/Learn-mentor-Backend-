@@ -49,9 +49,20 @@ chatRoomSchema.index({ student: 1, tutor: 1, booking: 1 }, { unique: true, spars
 const messageSchema = new mongoose_1.Schema({
     chatRoom: { type: mongoose_1.Schema.Types.ObjectId, ref: 'ChatRoom', required: true },
     sender: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
-    message: { type: String, required: true },
+    receiver: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
+    messageType: { type: String, enum: ['text', 'image', 'file'], default: 'text' },
+    message: {
+        type: String,
+        required: function () {
+            return !this.isDeleted && this.messageType === 'text';
+        }
+    },
+    fileUrl: { type: String },
+    fileName: { type: String },
     attachments: [{ type: String }],
-    isRead: { type: Boolean, default: false }
+    isRead: { type: Boolean, default: false },
+    isEdited: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false }
 }, { timestamps: true });
 messageSchema.index({ chatRoom: 1, createdAt: -1 });
 exports.ChatRoom = mongoose_1.default.models?.ChatRoom || (0, mongoose_1.model)('ChatRoom', chatRoomSchema);

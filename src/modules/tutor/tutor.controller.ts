@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { TutorService } from './tutor.service';
 import { TutorQuerySchema } from './tutor.dto';
 import { ZodError } from 'zod';
+import { io } from '../../socket';
 
 export class TutorController {
     /**
@@ -62,6 +63,40 @@ export class TutorController {
     }
 
     /**
+     * Get public availability for tutor by tutor user/profile id
+     * GET /api/tutors/:id/availability
+     */
+    static async getTutorAvailability(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { startDate, endDate } = req.query;
+
+            const slots = await TutorService.getPublicAvailabilitySlots(
+                id,
+                startDate ? new Date(startDate as string) : undefined,
+                endDate ? new Date(endDate as string) : undefined
+            );
+
+            res.status(200).json({
+                success: true,
+                slots
+            });
+        } catch (error: any) {
+            if (error.message === 'Tutor not found') {
+                return res.status(404).json({
+                    success: false,
+                    message: error.message
+                });
+            }
+
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to fetch tutor availability'
+            });
+        }
+    }
+
+    /**
      * Get authenticated tutor's availability
      * GET /api/tutors/my/availability
      */
@@ -106,11 +141,31 @@ export class TutorController {
 
             await TutorService.setAvailabilitySlots(tutorId, slots);
 
+            if (io) {
+                io.to(`availability:${tutorId}`).emit('availability_updated', {
+                    tutorId,
+                    updatedAt: new Date().toISOString()
+                });
+            }
+
             res.status(200).json({
                 success: true,
                 message: 'Availability updated successfully'
             });
         } catch (error: any) {
+            const validationMessages = new Set([
+                'Invalid slot date/time format',
+                'Each slot must have endTime after startTime',
+                'Availability slots cannot overlap'
+            ]);
+
+            if (validationMessages.has(error.message)) {
+                return res.status(400).json({
+                    success: false,
+                    message: error.message
+                });
+            }
+
             res.status(500).json({
                 success: false,
                 message: error.message || 'Failed to update availability'

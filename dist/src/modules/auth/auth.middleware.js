@@ -7,6 +7,16 @@ exports.optionalAuthenticate = exports.verifyTutor = exports.authorizeRole = exp
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const jwt_1 = require("../../config/jwt");
 const auth_repository_1 = require("./auth.repository");
+const normalizeRole = (rawRole) => {
+    const normalized = (rawRole || 'STUDENT').toString().trim().toUpperCase();
+    if (normalized === 'TUTOR')
+        return 'TUTOR';
+    if (normalized === 'ADMIN')
+        return 'ADMIN';
+    if (normalized === 'USER')
+        return 'STUDENT';
+    return 'STUDENT';
+};
 const authenticate = async (req, res, next) => {
     try {
         const authHeader = req.headers.authorization;
@@ -33,7 +43,7 @@ const authenticate = async (req, res, next) => {
         }
         req.user = {
             userId: user._id.toString(),
-            role: user.role,
+            role: normalizeRole(user.role),
             email: user.email,
         };
         next();
@@ -60,7 +70,8 @@ const authorizeRoles = (...roles) => {
                 message: 'Authentication required.',
             });
         }
-        if (!roles.includes(req.user.role)) {
+        const requesterRole = normalizeRole(req.user.role);
+        if (!roles.includes(requesterRole)) {
             return res.status(403).json({
                 success: false,
                 message: `Access denied. This endpoint requires one of the following roles: ${roles.join(', ')}`,
@@ -103,7 +114,7 @@ const optionalAuthenticate = async (req, res, next) => {
         if (user && user.isActive) {
             req.user = {
                 userId: user._id.toString(),
-                role: user.role,
+                role: normalizeRole(user.role),
                 email: user.email,
             };
         }

@@ -50,7 +50,12 @@ const messageSchema = new Schema<IMessage>({
     sender: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     receiver: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     messageType: { type: String, enum: ['text', 'image', 'file'], default: 'text' },
-    message: { type: String, required: function() { return !this.isDeleted && this.messageType === 'text'; } },
+    message: {
+        type: String,
+        required: function (this: IMessage): boolean {
+            return !this.isDeleted && this.messageType === 'text';
+        }
+    },
     fileUrl: { type: String },
     fileName: { type: String },
     attachments: [{ type: String }], // Keeping for backward compatibility or multiple files
