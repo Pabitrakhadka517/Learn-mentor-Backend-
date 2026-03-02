@@ -34,7 +34,14 @@ class ChatController {
             res.json({ success: true, chat });
         }
         catch (error) {
-            res.status(500).json({ success: false, message: error.message });
+            const message = error?.message || 'Failed to create chat';
+            if (message === 'Invalid chat participant ID') {
+                return res.status(400).json({ success: false, message });
+            }
+            if (message === 'You must have a paid booking with this tutor to start chatting.') {
+                return res.status(403).json({ success: false, message });
+            }
+            res.status(500).json({ success: false, message });
         }
     }
     static async getMessages(req, res) {

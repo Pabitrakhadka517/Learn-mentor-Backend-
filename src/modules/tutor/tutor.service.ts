@@ -1,6 +1,7 @@
 import { TutorProfile, AvailabilitySlot } from './tutor.model';
 import { TutorQueryDTO, TutorResponseDTO } from './tutor.dto';
 import { User } from '../auth/user.model';
+import { Booking } from '../booking/booking.model';
 import { Types } from 'mongoose';
 
 type SlotInput = { startTime: Date | string, endTime: Date | string };
@@ -335,10 +336,54 @@ export class TutorService {
             query.startTime.$lte = endDate;
         }
 
-        return await AvailabilitySlot.find(query)
+        const slots = await AvailabilitySlot.find(query)
             .sort({ startTime: 1 })
             .limit(120)
             .lean();
+
+        if (slots.length === 0) {
+            return slots;
+        }
+
+        const activeBookings = await Booking.find({
+            tutor: new Types.ObjectId(tutorUserId),
+            status: { $in: ['PENDING', 'CONFIRMED', 'ACCEPTED', 'PAID'] },
+            endTime: { $gt: now }
+        })
+            .select('_id startTime endTime availabilitySlot')
+            .lean();
+
+        if (activeBookings.length === 0) {
+            return slots;
+        }
+
+        const bookedSlotIds = activeBookings
+            .map((booking: any) => booking.availabilitySlot)
+            .filter(Boolean);
+
+        if (bookedSlotIds.length > 0) {
+            await AvailabilitySlot.updateMany(
+                {
+                    _id: { $in: bookedSlotIds },
+                    tutorId: new Types.ObjectId(tutorUserId),
+                    isBooked: false
+                },
+                { $set: { isBooked: true } }
+            );
+        }
+
+        return slots.filter((slot: any) => {
+            const slotStart = new Date(slot.startTime);
+            const slotEnd = new Date(slot.endTime);
+
+            const overlapsActiveBooking = activeBookings.some((booking: any) => {
+                const bookingStart = new Date(booking.startTime);
+                const bookingEnd = new Date(booking.endTime);
+                return bookingStart < slotEnd && bookingEnd > slotStart;
+            });
+
+            return !overlapsActiveBooking;
+        });
     }
 
     /**

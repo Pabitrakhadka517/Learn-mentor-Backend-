@@ -141,6 +141,8 @@ export class TutorController {
 
             await TutorService.setAvailabilitySlots(tutorId, slots);
 
+            const syncedSlots = await TutorService.getAvailabilitySlots(tutorId, new Date());
+
             if (io) {
                 io.to(`availability:${tutorId}`).emit('availability_updated', {
                     tutorId,
@@ -150,7 +152,8 @@ export class TutorController {
 
             res.status(200).json({
                 success: true,
-                message: 'Availability updated successfully'
+                message: 'Availability updated successfully',
+                slots: syncedSlots
             });
         } catch (error: any) {
             const validationMessages = new Set([

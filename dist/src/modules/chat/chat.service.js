@@ -49,12 +49,15 @@ class ChatService {
         };
     }
     static async getOrCreateChat(studentId, tutorId) {
+        if (!mongoose_1.Types.ObjectId.isValid(studentId) || !mongoose_1.Types.ObjectId.isValid(tutorId)) {
+            throw new Error('Invalid chat participant ID');
+        }
         const paidBookingExists = await booking_model_1.Booking.findOne({
             student: new mongoose_1.Types.ObjectId(studentId),
             tutor: new mongoose_1.Types.ObjectId(tutorId),
             $or: [
                 { status: { $in: ['PAID', 'COMPLETED'] } },
-                { paymentStatus: 'DONE' }
+                { paymentStatus: { $in: ['paid', 'PAID'] } }
             ]
         });
         if (!paidBookingExists) {

@@ -102,6 +102,7 @@ class TutorController {
                 });
             }
             await tutor_service_1.TutorService.setAvailabilitySlots(tutorId, slots);
+            const syncedSlots = await tutor_service_1.TutorService.getAvailabilitySlots(tutorId, new Date());
             if (socket_1.io) {
                 socket_1.io.to(`availability:${tutorId}`).emit('availability_updated', {
                     tutorId,
@@ -110,7 +111,8 @@ class TutorController {
             }
             res.status(200).json({
                 success: true,
-                message: 'Availability updated successfully'
+                message: 'Availability updated successfully',
+                slots: syncedSlots
             });
         }
         catch (error) {

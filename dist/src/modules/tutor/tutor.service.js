@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.TutorService = void 0;
 const tutor_model_1 = require("./tutor.model");
 const user_model_1 = require("../auth/user.model");
+const booking_model_1 = require("../booking/booking.model");
 const mongoose_1 = require("mongoose");
 class TutorService {
     static async resolveTutorUserId(identifier) {
@@ -243,10 +244,43 @@ class TutorService {
         if (endDate) {
             query.startTime.$lte = endDate;
         }
-        return await tutor_model_1.AvailabilitySlot.find(query)
+        const slots = await tutor_model_1.AvailabilitySlot.find(query)
             .sort({ startTime: 1 })
             .limit(120)
             .lean();
+        if (slots.length === 0) {
+            return slots;
+        }
+        const activeBookings = await booking_model_1.Booking.find({
+            tutor: new mongoose_1.Types.ObjectId(tutorUserId),
+            status: { $in: ['PENDING', 'CONFIRMED', 'ACCEPTED', 'PAID'] },
+            endTime: { $gt: now }
+        })
+            .select('_id startTime endTime availabilitySlot')
+            .lean();
+        if (activeBookings.length === 0) {
+            return slots;
+        }
+        const bookedSlotIds = activeBookings
+            .map((booking) => booking.availabilitySlot)
+            .filter(Boolean);
+        if (bookedSlotIds.length > 0) {
+            await tutor_model_1.AvailabilitySlot.updateMany({
+                _id: { $in: bookedSlotIds },
+                tutorId: new mongoose_1.Types.ObjectId(tutorUserId),
+                isBooked: false
+            }, { $set: { isBooked: true } });
+        }
+        return slots.filter((slot) => {
+            const slotStart = new Date(slot.startTime);
+            const slotEnd = new Date(slot.endTime);
+            const overlapsActiveBooking = activeBookings.some((booking) => {
+                const bookingStart = new Date(booking.startTime);
+                const bookingEnd = new Date(booking.endTime);
+                return bookingStart < slotEnd && bookingEnd > slotStart;
+            });
+            return !overlapsActiveBooking;
+        });
     }
     static async setAvailabilitySlots(tutorId, slots) {
         const tid = new mongoose_1.Types.ObjectId(tutorId);

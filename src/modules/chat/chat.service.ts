@@ -71,14 +71,18 @@ export class ChatService {
      * Get or create a chat room between two users (Inquiry Mode)
      */
     static async getOrCreateChat(studentId: string, tutorId: string) {
+        if (!Types.ObjectId.isValid(studentId) || !Types.ObjectId.isValid(tutorId)) {
+            throw new Error('Invalid chat participant ID');
+        }
+
         // Enforce: Must have a paid booking together to chat
-        // We check for EITHER paymentStatus: 'DONE' OR status: 'PAID'/'COMPLETED'
+        // We check for EITHER paid paymentStatus OR paid/completed booking status
         const paidBookingExists = await Booking.findOne({
             student: new Types.ObjectId(studentId),
             tutor: new Types.ObjectId(tutorId),
             $or: [
                 { status: { $in: ['PAID', 'COMPLETED'] } },
-                { paymentStatus: 'DONE' }
+                { paymentStatus: { $in: ['paid', 'PAID'] } }
             ]
         });
 
