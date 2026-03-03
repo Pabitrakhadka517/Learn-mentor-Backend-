@@ -70,24 +70,41 @@ export class ChatService {
     /**
      * Get or create a chat room between two users (Inquiry Mode)
      */
-    static async getOrCreateChat(studentId: string, tutorId: string) {
+    static async getOrCreateChat(studentId: string, tutorId: string, initiatorRole?: string) {
         if (!Types.ObjectId.isValid(studentId) || !Types.ObjectId.isValid(tutorId)) {
             throw new Error('Invalid chat participant ID');
         }
 
-        // Enforce: Must have a paid booking together to chat
-        // We check for EITHER paid paymentStatus OR paid/completed booking status
-        const paidBookingExists = await Booking.findOne({
+        // Enforce booking relationship to chat
+        // Tutors can message any student with a confirmed/paid/completed booking
+        // Students must have a paid booking to initiate chat
+        const bookingQuery: any = {
             student: new Types.ObjectId(studentId),
             tutor: new Types.ObjectId(tutorId),
-            $or: [
+        };
+
+        if (initiatorRole === 'TUTOR') {
+            // Tutors can chat with students who have confirmed, paid, or completed bookings
+            bookingQuery.$or = [
+                { status: { $in: ['CONFIRMED', 'PAID', 'COMPLETED'] } },
+                { paymentStatus: { $in: ['paid', 'PAID'] } }
+            ];
+        } else {
+            // Students need a paid booking to start chatting
+            bookingQuery.$or = [
                 { status: { $in: ['PAID', 'COMPLETED'] } },
                 { paymentStatus: { $in: ['paid', 'PAID'] } }
-            ]
-        });
+            ];
+        }
 
-        if (!paidBookingExists) {
-            throw new Error('You must have a paid booking with this tutor to start chatting.');
+        const bookingExists = await Booking.findOne(bookingQuery);
+
+        if (!bookingExists) {
+            throw new Error(
+                initiatorRole === 'TUTOR'
+                    ? 'No confirmed booking found with this student.'
+                    : 'You must have a paid booking with this tutor to start chatting.'
+            );
         }
 
         // Check for existing non-booking chat or booking-linked chat

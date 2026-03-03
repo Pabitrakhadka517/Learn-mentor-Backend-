@@ -13,7 +13,11 @@ const fileFilter: multer.Options['fileFilter'] = (req, file, cb) => {
         'text/plain'
     ];
 
-    if (allowedMimetypes.includes(file.mimetype) || file.mimetype.startsWith('image/')) {
+    if (
+        allowedMimetypes.includes(file.mimetype) ||
+        file.mimetype.startsWith('image/') ||
+        file.mimetype.startsWith('video/')
+    ) {
         cb(null, true);
     } else {
         cb(new Error('This file type is not supported in the Chat at this moment!'));

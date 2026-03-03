@@ -33,9 +33,9 @@ export class ChatController {
 
             let chat;
             if (role === 'STUDENT') {
-                chat = await ChatService.getOrCreateChat(userId, targetId);
+                chat = await ChatService.getOrCreateChat(userId, targetId, role);
             } else {
-                chat = await ChatService.getOrCreateChat(targetId, userId);
+                chat = await ChatService.getOrCreateChat(targetId, userId, role);
             }
 
             res.json({ success: true, chat });
@@ -46,7 +46,8 @@ export class ChatController {
                 return res.status(400).json({ success: false, message });
             }
 
-            if (message === 'You must have a paid booking with this tutor to start chatting.') {
+            if (message === 'You must have a paid booking with this tutor to start chatting.' ||
+                message === 'No confirmed booking found with this student.') {
                 return res.status(403).json({ success: false, message });
             }
 
