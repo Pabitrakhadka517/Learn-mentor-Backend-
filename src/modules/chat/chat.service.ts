@@ -250,7 +250,9 @@ export class ChatService {
         if (ioInstance) {
             ioInstance.to(message.chatRoom.toString()).emit('message_deleted', {
                 messageId: message._id,
-                chatRoom: message.chatRoom
+                chatRoom: message.chatRoom,
+                content: message.message,
+                updatedAt: message.updatedAt
             });
         }
 

@@ -53,8 +53,16 @@ const notificationSchema = new Schema<INotification>({
 }, { timestamps: true });
 
 // Indexes for fast queries
+// Index for filtering by recipient (primary)
 notificationSchema.index({ recipient: 1 });
+
+// Compound index for recipient + read status (for unread count queries)
 notificationSchema.index({ recipient: 1, isRead: 1 });
+
+// Compound index for recipient + createdAt descending (for paginated fetches)
+notificationSchema.index({ recipient: 1, createdAt: -1 });
+
+// Index for global sorting by creation date
 notificationSchema.index({ createdAt: -1 });
 
 export const Notification = mongoose.models?.Notification || model<INotification>('Notification', notificationSchema);
