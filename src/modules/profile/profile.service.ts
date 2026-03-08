@@ -146,7 +146,6 @@ export class ProfileService {
         }
     }
 
-
     /**
      * Delete profile image
      */

@@ -104,7 +104,7 @@ app.use("/api/profile", profileRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/tutors", tutorRoutes);
 app.use("/api/chats", chatRoutes);
-app.use("/api/transactions", transactionRoutes); // Updated import to use a dedicated prefix if desired, or keep /api if general
+app.use("/api/transactions", transactionRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/bookings", bookingRoutes);
